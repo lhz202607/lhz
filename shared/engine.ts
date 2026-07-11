@@ -103,14 +103,14 @@ export function assignRoles(room: Room): void {
 }
 
 /** 获取老朝奉阵营玩家可见的队友列表 */
-export function getKnownAllies(room: Room, playerId: string): RoleId[] {
+export function getKnownAllies(room: Room, playerId: string): { playerId: string; playerName: string; roleId: RoleId }[] {
   const player = room.players.find(p => p.id === playerId);
   if (!player || !player.role) return [];
   if (player.role === 'laochaofeng' || player.role === 'yaoburan') {
     // 老朝奉和药不然互相可见
     return room.players
       .filter(p => p.id !== playerId && (p.role === 'laochaofeng' || p.role === 'yaoburan'))
-      .map(p => p.role!);
+      .map(p => ({ playerId: p.id, playerName: p.name, roleId: p.role! }));
   }
   // 郑国渠看不到队友，其他好人也不知道队友
   return [];
@@ -367,8 +367,8 @@ export function resolveBets(room: Room): void {
   room.game.phase = 'reveal';
 
   const entries = Object.entries(round.betCounts).map(([id, count]) => ({ artifactId: Number(id), count }));
-  // 排序：票数降序，票数相同时按兽首 ID 降序（生肖排序靠后的优先）
-  entries.sort((a, b) => b.count - a.count || b.artifactId - a.artifactId);
+  // 排序：票数降序，票数相同时按兽首 ID 升序（生肖靠前的隐藏，靠后的揭示）
+  entries.sort((a, b) => b.count - a.count || a.artifactId - b.artifactId);
 
   if (entries.length === 0) { round.events.push('本轮无人押币。'); return; }
 

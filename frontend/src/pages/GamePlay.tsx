@@ -220,13 +220,16 @@ export default function GamePlay() {
                     <div className="text-vermilion text-xs font-bold mb-1 flex items-center gap-1">
                       <Eye className="w-3 h-3" /> 已知队友
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {knownAllies.map((roleId: RoleId) => {
-                        const ally = (ROLE_INFO as any)[roleId];
+                    <div className="space-y-1">
+                      {knownAllies.map((ally: any) => {
+                        const allyRole = (ROLE_INFO as any)[ally.roleId];
                         return (
-                          <span key={roleId} className="text-xs px-2 py-0.5 rounded-full bg-vermilion/20 text-vermilion">
-                            {ally?.name}
-                          </span>
+                          <div key={ally.playerId} className="flex items-center gap-1.5 bg-black/20 px-2 py-1 rounded">
+                            <div className="player-token w-5 h-5 text-[9px]">{ally.playerName[0]}</div>
+                            <span className="text-xs text-ivory">{ally.playerName}</span>
+                            <span className="text-xs text-vermilion font-bold">·</span>
+                            <span className="text-xs text-vermilion">{allyRole?.name}</span>
+                          </div>
                         );
                       })}
                     </div>
@@ -377,7 +380,7 @@ function ZodiacBoard({ room, game }: { room: any; game: any }) {
           {isReveal ? '押币结果揭示中' : g.phase === 'vote' ? '选择押币目标' : '点击鉴定真伪'}
         </div>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {g.revealedArtifacts.length > 0
           ? g.revealedArtifacts.map((a: any) => {
               // 找到投了这个兽首的玩家
@@ -385,29 +388,42 @@ function ZodiacBoard({ room, game }: { room: any; game: any }) {
                 .filter(([_, votes]) => (votes as number[]).includes(a.id))
                 .map(([pid]) => room.players.find((p: any) => p.id === pid))
                 .filter(Boolean);
+              // 统计每个玩家投了几票
+              const voterCounts: Record<string, number> = {};
+              for (const [pid, votes] of Object.entries(playerVotes)) {
+                const count = (votes as number[]).filter(id => id === a.id).length;
+                if (count > 0) voterCounts[pid] = count;
+              }
               return (
-                <div key={a.id} className="zodiac-card aspect-[3/4] flex flex-col items-center justify-center p-2 relative overflow-hidden">
-                  <ZodiacTileInner
-                    name={a.name}
-                    state={
-                      a.hidden ? 'hidden' :
-                      a.isReal === true ? 'real' :
-                      a.isReal === false ? 'fake' :
-                      'normal'
-                    }
-                    betCount={a.betCount}
-                  />
+                <div key={a.id} className="card-antique p-2 flex flex-col items-center">
+                  <div className="zodiac-card aspect-[3/4] w-full flex flex-col items-center justify-center p-2 relative">
+                    <ZodiacTileInner
+                      name={a.name}
+                      state={
+                        a.hidden ? 'hidden' :
+                        a.isReal === true ? 'real' :
+                        a.isReal === false ? 'fake' :
+                        'normal'
+                      }
+                      betCount={a.betCount}
+                    />
+                  </div>
                   {/* 投票玩家列表 */}
                   {voters.length > 0 && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                      <div className="flex flex-wrap gap-0.5 justify-center">
-                        {voters.map((p: any) => (
-                          <span key={p.id} className="text-[8px] text-gold-glow truncate max-w-[40px]" title={p.name}>
-                            {p.name}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="w-full mt-1.5 space-y-0.5">
+                      <div className="text-[10px] text-ivory-dim text-center mb-0.5">投票者</div>
+                      {voters.map((p: any) => (
+                        <div key={p.id} className="flex items-center justify-between bg-black/20 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] text-gold-glow truncate">{p.name}</span>
+                          {voterCounts[p.id] > 1 && (
+                            <span className="text-[9px] text-bronze font-bold">x{voterCounts[p.id]}</span>
+                          )}
+                        </div>
+                      ))}
                     </div>
+                  )}
+                  {voters.length === 0 && (
+                    <div className="text-[10px] text-ivory-dim mt-1">无人投票</div>
                   )}
                 </div>
               );

@@ -13,7 +13,7 @@ interface GameState {
   myAppraisals: any;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
-  knownAllies: RoleId[];
+  knownAllies: { playerId: string; playerName: string; roleId: RoleId }[];
   remainingVotes: number;
   error: string | null;
   connected: boolean;
@@ -42,7 +42,7 @@ interface HeartbeatResponse {
   myAppraisals: Record<number, AppraisalResult[]>;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
-  knownAllies?: RoleId[];
+  knownAllies?: { playerId: string; playerName: string; roleId: RoleId }[];
   remainingVotes?: number;
 }
 

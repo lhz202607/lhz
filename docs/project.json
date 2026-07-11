@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局十二兽首",
   "app_slug": "antique-game",
-  "version_description": "修复黑屏问题hooks顺序错误",
+  "version_description": "修复队友显示和投票明细优化",
   "preview_type": "pc"
 }
