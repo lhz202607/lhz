@@ -11,7 +11,7 @@ import { runAIAction } from './ai';
 export const gameRouter = Router();
 
 /** 创建房间 */
-gameRouter.post('/rooms', (req, res) => {
+gameRouter.post('/rooms', (req, res): void => {
   const { name, maxPlayers } = req.body || {};
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return res.status(400).json({ error: '请输入昵称' });
@@ -22,7 +22,7 @@ gameRouter.post('/rooms', (req, res) => {
 });
 
 /** 查询房间是否存在 */
-gameRouter.get('/rooms/:code', (req, res) => {
+gameRouter.get('/rooms/:code', (req, res): void => {
   const room = roomManager.getRoom(req.params.code);
   if (!room) return res.status(404).json({ error: '房间不存在' });
   res.json({
@@ -34,7 +34,7 @@ gameRouter.get('/rooms/:code', (req, res) => {
 });
 
 /** 加入房间（HTTP）*/
-gameRouter.post('/rooms/:code/join', (req, res) => {
+gameRouter.post('/rooms/:code/join', (req, res): void => {
   const { name, pid } = req.body || {};
   if (!name) return res.status(400).json({ error: '请输入昵称' });
   const code = req.params.code.toUpperCase();
@@ -98,7 +98,7 @@ gameRouter.post('/rooms/:code/join', (req, res) => {
 });
 
 /** 心跳：标记玩家在线，返回最新房间状态 */
-gameRouter.post('/rooms/:code/heartbeat', (req, res) => {
+gameRouter.post('/rooms/:code/heartbeat', (req, res): void => {
   const code = req.params.code.toUpperCase();
   const { playerId } = req.body || {};
   const room = roomManager.getRoom(code);
@@ -126,7 +126,7 @@ gameRouter.post('/rooms/:code/heartbeat', (req, res) => {
 });
 
 /** 离开房间 */
-gameRouter.post('/rooms/:code/leave', (req, res) => {
+gameRouter.post('/rooms/:code/leave', (req, res): void => {
   const code = req.params.code.toUpperCase();
   const { playerId } = req.body || {};
   roomManager.markDisconnected(code, playerId);
@@ -134,7 +134,7 @@ gameRouter.post('/rooms/:code/leave', (req, res) => {
 });
 
 /** 通用行动接口 */
-gameRouter.post('/rooms/:code/action', (req, res) => {
+gameRouter.post('/rooms/:code/action', (req, res): void => {
   const code = req.params.code.toUpperCase();
   const { playerId, action } = req.body || {};
   const room = roomManager.getRoom(code);
