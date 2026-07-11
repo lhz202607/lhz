@@ -4,9 +4,7 @@
   "private": true,
   "description": "古董局中局·十二兽首 多人在线桌游",
   "scripts": {
-    "build:frontend": "cd frontend && pnpm install && pnpm build",
-    "build:backend": "cd backend && pnpm install && pnpm build",
-    "build": "pnpm build:frontend && pnpm build:backend",
+    "build": "cd frontend && npm install && npm run build && cd ../backend && npm install && npm run build",
     "start": "node backend/dist/src/index.js"
   },
   "engines": {
