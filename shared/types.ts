@@ -183,6 +183,8 @@ export interface GameState {
   playerRoundStates: Record<string, Record<number, PlayerRoundState>>;
   /** 鉴人环节投票：playerId -> targetId */
   identifyVotes: Record<string, string>;
+  /** 预先设定的跳过轮次：playerId -> roundNumber（木户加奈/黄烟烟随机一轮无法鉴宝） */
+  skipRoundsMap: Record<string, number>;
 }
 
 export interface Room {

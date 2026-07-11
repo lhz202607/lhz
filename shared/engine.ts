@@ -57,7 +57,7 @@ export function createInitialState(): GameState {
     phase: 'waiting', currentRound: 1, rounds: [],
     xuyuanScore: 0, targetScore: TARGET_SCORE,
     endLog: [], playerRoundStates: {},
-    identifyVotes: {},
+    identifyVotes: {}, skipRoundsMap: {},
   };
 }
 
@@ -100,6 +100,13 @@ export function assignRoles(room: Room): void {
   room.game.endLog = [];
   room.game.winner = undefined;
   room.game.identifyVotes = {};
+  // 预先设定木户加奈/黄烟烟的跳过轮次（每人在1-3轮中随机一轮无法鉴宝）
+  room.game.skipRoundsMap = {};
+  room.players.forEach(p => {
+    if (p.role === 'huangyanyan' || p.role === 'muhujianai') {
+      room.game.skipRoundsMap[p.id] = 1 + Math.floor(Math.random() * 3);
+    }
+  });
 }
 
 /** 获取老朝奉阵营玩家可见的队友列表 */
@@ -158,13 +165,9 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
     p.finishedVote = false;
   });
 
-  const skipPlayers = room.players.filter(p => p.role === 'huangyanyan' || p.role === 'muhujianai');
-  const skipRounds = new Set<number>();
-  skipRounds.add(1 + Math.floor(Math.random() * 3));
-
   room.players.forEach(p => {
     if (!game.playerRoundStates[p.id]) game.playerRoundStates[p.id] = {};
-    const randomlyBlocked = skipPlayers.includes(p) && skipRounds.has(roundNumber);
+    const randomlyBlocked = game.skipRoundsMap?.[p.id] === roundNumber;
     game.playerRoundStates[p.id][roundNumber] = { sealed: false, randomlyBlocked, appraisals: [] };
   });
 }

@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局十二兽首",
   "app_slug": "antique-game",
-  "version_description": "修复揭示面板显示错误兽首问题",
+  "version_description": "修复木户加奈随机跳过轮次和移除AI弹窗",
   "preview_type": "pc"
 }

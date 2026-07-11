@@ -49,7 +49,6 @@ export default function RoomLobby() {
   const handleAddAI = async () => {
     try {
       await addAI();
-      toast.success('已添加机器人');
     } catch {
       toast.error('添加失败');
     }
