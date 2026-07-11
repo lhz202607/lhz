@@ -101,11 +101,13 @@ export default function GamePlay() {
               {room.players.map((p, i) => {
                 const isMe = p.id === me.id;
                 const isCurrentSpeaker = g.phase === 'discuss' && g.speechOrder[g.currentSpeakerIndex] === p.id;
+                const isCurrentAppraiser = g.phase === 'appraise' && g.currentAppraiserId === p.id;
+                const hasFinishedAppraise = (g.finishedAppraisers || []).includes(p.id);
                 return (
                   <div
                     key={p.id}
                     className={`p-2 rounded-md border transition-all min-w-[140px] lg:min-w-0 shrink-0 lg:shrink ${
-                      isCurrentSpeaker ? 'border-gold-glow animate-glow' : 'border-bronze/20'
+                      (isCurrentSpeaker || isCurrentAppraiser) ? 'border-gold-glow animate-glow' : 'border-bronze/20'
                     } ${isMe ? 'bg-bronze/10' : 'bg-black/20'}`}
                   >
                     <div className="flex items-center gap-2">
@@ -128,6 +130,12 @@ export default function GamePlay() {
                           )}
                           {isCurrentSpeaker && (
                             <span className="text-[10px] text-gold-glow">发言中</span>
+                          )}
+                          {isCurrentAppraiser && (
+                            <span className="text-[10px] text-gold-glow">鉴宝中</span>
+                          )}
+                          {g.phase === 'appraise' && hasFinishedAppraise && !isCurrentAppraiser && (
+                            <span className="text-[10px] text-jade">已鉴完</span>
                           )}
                           {g.phase === 'vote' && p.betArtifactId !== undefined && (
                             <span className="text-[10px] text-jade flex items-center gap-0.5">
@@ -560,6 +568,45 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
             确认全员完成鉴宝与技能后点击推进
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// 指定下一个鉴宝玩家面板
+// ============================================================
+function PassTurnPanel({ room, game, finishedAppraisers, onPass }: {
+  room: any;
+  game: any;
+  finishedAppraisers: string[];
+  onPass: (nextPlayerId: string) => void;
+}) {
+  const me = game.me;
+  const candidates = room.players.filter((p: any) =>
+    p.id !== me.id && !finishedAppraisers.includes(p.id)
+  );
+
+  return (
+    <div className="bg-gold-glow/5 p-3 rounded-md border border-gold-glow/30 animate-float-in">
+      <div className="text-gold-glow text-sm font-bold mb-2 flex items-center gap-1">
+        <Sparkles className="w-4 h-4" /> 你的鉴宝已完毕
+      </div>
+      <div className="text-ivory-dim text-xs mb-3">请指定下一位鉴宝玩家：</div>
+      <div className="flex flex-wrap gap-2">
+        {candidates.map((p: any) => (
+          <button
+            key={p.id}
+            onClick={() => onPass(p.id)}
+            className="btn-bronze px-3 py-1.5 rounded text-sm flex items-center gap-1.5"
+          >
+            <span className="player-token w-6 h-6 text-[10px]">{p.name[0]}</span>
+            {p.name}
+          </button>
+        ))}
+      </div>
+      {candidates.length === 0 && (
+        <div className="text-ivory-dim text-xs">所有人已鉴宝完毕</div>
       )}
     </div>
   );

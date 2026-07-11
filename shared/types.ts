@@ -213,6 +213,12 @@ export interface GameRound {
   revealedIsReal?: boolean;
   /** 揭露阶段产生的发言/日志 */
   events: string[];
+  /** 当前正在鉴宝的玩家 id */
+  currentAppraiserId?: string;
+  /** 已完成鉴宝的玩家 id 列表（顺序） */
+  appraiseOrder: string[];
+  /** 已完成鉴宝的玩家 id 集合 */
+  finishedAppraisers: string[];
 }
 
 /** 游戏状态 */
@@ -252,12 +258,14 @@ export type ClientMessage =
   | { type: 'join'; name: string }
   | { type: 'addAI' }
   | { type: 'startGame' }
+  | { type: 'kickPlayer'; targetId: string }
   | { type: 'appraise'; artifactId: number }
   | { type: 'fangzhenCheck'; targetId: string }
   | { type: 'yaoburanSeal'; targetId: string }
   | { type: 'zhengguoquLock'; artifactId: number }
   | { type: 'laochaofengFlip'; use: boolean }
   | { type: 'finishAppraise' }       // 玩家确认结束本轮鉴宝
+  | { type: 'passAppraiseTurn'; nextPlayerId: string }  // 鉴宝完毕后指定下一个鉴宝玩家
   | { type: 'speech'; content: string }
   | { type: 'bet'; artifactId: number }
   | { type: 'nextRound' }            // 房主进入下一轮
@@ -312,6 +320,10 @@ export interface PublicRoom {
     events: string[];
     /** 当前轮老朝奉是否已使用颠倒（全员可见「已使用」但不告知是谁用） */
     flipUsedThisRound: boolean;
+    /** 当前鉴宝玩家 id */
+    currentAppraiserId?: string;
+    /** 已完成鉴宝的玩家 id 列表 */
+    finishedAppraisers: string[];
   };
 }
 

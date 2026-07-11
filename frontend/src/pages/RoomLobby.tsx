@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { connectGame, disconnectGame, send, useGameState } from '@/lib/game/client';
 import { Button } from '@/components/ui/button';
-import { Copy, Crown, LogOut, Users } from 'lucide-react';
+import { Copy, Crown, LogOut, Users, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function RoomLobby() {
@@ -127,6 +127,18 @@ export default function RoomLobby() {
                     {!p.connected && <span className="text-vermilion">已断线</span>}
                   </div>
                 </div>
+                {isHost && !p.isHost && p.id !== me?.id && (
+                  <button
+                    onClick={() => {
+                      send({ type: 'kickPlayer', targetId: p.id });
+                      toast.success(`已踢出 ${p.name}`);
+                    }}
+                    className="btn-ghost px-2 py-1.5 rounded text-vermilion hover:bg-vermilion/10"
+                    title="踢出房间"
+                  >
+                    <UserX className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             ))}
 

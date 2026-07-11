@@ -54,6 +54,17 @@ class RoomManager {
     }
   }
 
+  /** 踢出玩家（仅房主可用） */
+  removePlayer(code: string, playerId: string): { ok: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { ok: false, error: '房间不存在' };
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) return { ok: false, error: '玩家不存在' };
+    if (player.isHost) return { ok: false, error: '不能踢出房主' };
+    room.players = room.players.filter(p => p.id !== playerId);
+    return { ok: true };
+  }
+
   /** 转换为公开房间视图（带个人视角） */
   toPublicRoom(room: Room, viewerId?: string): PublicRoom {
     const round = room.game.rounds[room.game.currentRound - 1];
@@ -130,6 +141,8 @@ class RoomManager {
         speeches,
         events,
         flipUsedThisRound,
+        currentAppraiserId: round?.currentAppraiserId,
+        finishedAppraisers: round?.finishedAppraisers || [],
       },
     };
   }

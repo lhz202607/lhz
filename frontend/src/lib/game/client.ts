@@ -42,7 +42,7 @@ function setState(patch: Partial<GameState>) {
 interface HeartbeatResponse {
   room: PublicRoom;
   myRole: RoleId | null;
-  myAppraisals: AppraisalResult[];
+  myAppraisals: Record<number, AppraisalResult[]>;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
 }
@@ -84,7 +84,7 @@ function stopPolling(): void {
 export async function connectGame(code: string, name: string, pid?: string): Promise<void> {
   roomCode = code.toUpperCase();
   setState({
-    room: null, me: null, myRole: null, myAppraisals: [],
+    room: null, me: null, myRole: null, myAppraisals: {},
     fangzhenResults: [], sealedRounds: [], error: null, connected: false,
   });
   emit();
@@ -95,7 +95,7 @@ export async function connectGame(code: string, name: string, pid?: string): Pro
     applyHeartbeat({
       room: res.data.room,
       myRole: res.data.myRole || null,
-      myAppraisals: res.data.myAppraisals || [],
+      myAppraisals: res.data.myAppraisals || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
     });
@@ -114,7 +114,7 @@ export async function send(msg: ClientMessage): Promise<void> {
     applyHeartbeat({
       room: res.data.room,
       myRole: res.data.myRole || null,
-      myAppraisals: res.data.myAppraisals || [],
+      myAppraisals: res.data.myAppraisals || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
     });
@@ -150,7 +150,7 @@ export function disconnectGame(): void {
   playerId = null;
   roomCode = null;
   state = {
-    room: null, me: null, myRole: null, myAppraisals: [],
+    room: null, me: null, myRole: null, myAppraisals: {},
     fangzhenResults: [], sealedRounds: [], error: null, connected: false,
   };
   emit();

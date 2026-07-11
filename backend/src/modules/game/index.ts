@@ -10,6 +10,17 @@ import { runAIAction } from './ai';
 
 export const gameRouter = Router();
 
+/** 构建玩家所有轮次的鉴宝结果 */
+function buildAllAppraisals(room: any, playerId: string): Record<number, any[]> {
+  const states = room.game.playerRoundStates[playerId];
+  if (!states) return {};
+  const result: Record<number, any[]> = {};
+  for (const [roundNum, state] of Object.entries(states)) {
+    result[Number(roundNum)] = (state as any).appraisals || [];
+  }
+  return result;
+}
+
 /** 创建房间 */
 gameRouter.post('/rooms', (req, res) => {
   const { name, maxPlayers } = req.body || {};
@@ -113,7 +124,7 @@ gameRouter.post('/rooms/:code/heartbeat', (req, res) => {
   res.json({
     room: roomManager.toPublicRoom(room, playerId),
     myRole: viewer?.role || null,
-    myAppraisals: room.game.playerRoundStates[playerId]?.[room.game.currentRound]?.appraisals || [],
+    myAppraisals: buildAllAppraisals(room, playerId),
     fangzhenResults: viewer?.fangzhenCheckResult ? [{
       round: room.game.currentRound,
       targetId: viewer.fangzhenCheckTarget!,
@@ -147,6 +158,13 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
 
   try {
     switch (msg.type) {
+      case 'kickPlayer': {
+        if (!player.isHost) { error = '只有房主可以踢人'; break; }
+        if (room.game.phase !== 'waiting') { error = '游戏已开始，无法踢人'; break; }
+        const kickResult = roomManager.removePlayer(code, msg.targetId);
+        if (!kickResult.ok) error = kickResult.error!;
+        break;
+      }
       case 'startGame': {
         if (!player.isHost) { error = '只有房主可以开始游戏'; break; }
         // 调试模式：X-Dev-Mode header 跳过人数检查
@@ -186,6 +204,12 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
         if (!player.isHost) { error = '由房主推进阶段'; break; }
         if (room.game.phase !== 'appraise') { error = '当前非鉴宝阶段'; break; }
         engine.enterDiscussPhase(room);
+        break;
+      }
+      case 'passAppraiseTurn': {
+        if (room.game.phase !== 'appraise') { error = '当前非鉴宝阶段'; break; }
+        const passResult = engine.passAppraiseTurn(room, playerId, msg.nextPlayerId);
+        if (!passResult.ok) error = passResult.error!;
         break;
       }
       case 'speech': {
@@ -238,7 +262,7 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
   res.json({
     room: roomManager.toPublicRoom(room, playerId),
     myRole: viewer?.role || null,
-    myAppraisals: room.game.playerRoundStates[playerId]?.[room.game.currentRound]?.appraisals || [],
+    myAppraisals: buildAllAppraisals(room, playerId),
     fangzhenResults: viewer?.fangzhenCheckResult ? [{
       round: room.game.currentRound,
       targetId: viewer.fangzhenCheckTarget!,

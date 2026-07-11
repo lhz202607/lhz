@@ -1,8 +1,8 @@
 {
   "project_type": "web",
   "sub_project_type": "",
-  "name": "古董局中局",
+  "name": "古董局中局十二兽首",
   "app_slug": "antique-game",
-  "version_description": "推送代码至GitHub并生成Render公网部署配置",
+  "version_description": "Fix Render deployment root package.json",
   "preview_type": "pc"
 }

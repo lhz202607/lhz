@@ -90,7 +90,9 @@ export function createAIPlayer(name?: string): Player {
 export function assignRoles(room: Room): void {
   const config = ROLE_CONFIGS[room.players.length];
   if (!config) throw new Error(`不支持 ${room.players.length} 人局`);
-  const deck = shuffle(config);
+  // 确保角色不重复：去重后再洗牌
+  const uniqueRoles = [...new Set(config)];
+  const deck = shuffle(uniqueRoles);
   room.players.forEach((p, i) => {
     p.role = deck[i];
     // 重置玩家游戏内状态
@@ -118,6 +120,11 @@ export function startRound(room: Room, roundNumber: number): void {
   // 发言顺序随机
   const speechOrder = shuffle(room.players.map(p => p.id));
 
+  // 鉴宝顺序：随机打乱
+  const appraiseOrder = shuffle(room.players.map(p => p.id));
+  // 第一个鉴宝玩家
+  const firstAppraiser = appraiseOrder[0];
+
   const round: GameRound = {
     roundNumber,
     phase: 'appraise',
@@ -127,6 +134,9 @@ export function startRound(room: Room, roundNumber: number): void {
     laochaofengUsedFlip: false,
     betCounts: {},
     events: [],
+    currentAppraiserId: firstAppraiser,
+    appraiseOrder,
+    finishedAppraisers: [],
   };
 
   // 移除上一轮数据（保留历史 rounds 数组用于记录）
@@ -197,10 +207,17 @@ export function appraise(room: Room, playerId: string, artifactId: number): Appr
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { error: '玩家不存在' };
 
+  const round = room.game.rounds[room.game.currentRound - 1];
+  if (!round) return { error: '当前无进行中的轮次' };
+
+  // 只有当前鉴宝玩家可以鉴定
+  if (round.currentAppraiserId && round.currentAppraiserId !== playerId) {
+    return { error: '当前不是你的鉴宝回合' };
+  }
+
   const check = canAppraise(room, playerId);
   if (!check.can) return { error: check.reason || '无法鉴宝' };
 
-  const round = room.game.rounds[room.game.currentRound - 1];
   const artifact = round.artifacts.find(a => a.id === artifactId);
   if (!artifact) return { error: '兽首不存在' };
 
@@ -226,6 +243,80 @@ export function appraise(room: Room, playerId: string, artifactId: number): Appr
   const result: AppraisalResult = { artifactId, appearsReal };
   rs.appraisals.push(result);
   return result;
+}
+
+/** 鉴宝玩家指定下一个鉴宝玩家 */
+export function passAppraiseTurn(room: Room, playerId: string, nextPlayerId: string): { ok: boolean; error?: string } {
+  const round = room.game.rounds[room.game.currentRound - 1];
+  if (!round) return { ok: false, error: '当前无进行中的轮次' };
+  if (room.game.phase !== 'appraise') return { ok: false, error: '当前非鉴宝阶段' };
+
+  // 只有当前鉴宝玩家可以指定下一个
+  if (round.currentAppraiserId !== playerId) {
+    return { ok: false, error: '当前不是你的鉴宝回合' };
+  }
+
+  // 不能指定自己
+  if (playerId === nextPlayerId) {
+    return { ok: false, error: '不能指定自己' };
+  }
+
+  // 不能指定已完成的玩家
+  if (round.finishedAppraisers.includes(nextPlayerId)) {
+    return { ok: false, error: '该玩家已完成鉴宝' };
+  }
+
+  const nextPlayer = room.players.find(p => p.id === nextPlayerId);
+  if (!nextPlayer) return { ok: false, error: '目标玩家不存在' };
+
+  // 标记当前玩家完成
+  if (!round.finishedAppraisers.includes(playerId)) {
+    round.finishedAppraisers.push(playerId);
+  }
+
+  // 检查目标玩家是否可以鉴宝
+  const nextCheck = canAppraise(room, nextPlayerId);
+  if (!nextCheck.can) {
+    // 目标玩家无法鉴宝，也标记为完成，继续找下一个
+    if (!round.finishedAppraisers.includes(nextPlayerId)) {
+      round.finishedAppraisers.push(nextPlayerId);
+    }
+    // 自动跳到下一个未完成的玩家
+    const remaining = round.appraiseOrder.find(id =>
+      !round.finishedAppraisers.includes(id) && canAppraise(room, id).can
+    );
+    if (remaining) {
+      round.currentAppraiserId = remaining;
+    } else {
+      // 检查是否还有任何能鉴宝的玩家
+      const anyLeft = round.appraiseOrder.find(id =>
+        !round.finishedAppraisers.includes(id) && canAppraise(room, id).can
+      );
+      if (!anyLeft) {
+        // 所有人都完成了（或无法鉴宝），标记无法鉴宝的玩家也完成
+        round.appraiseOrder.forEach(id => {
+          if (!round.finishedAppraisers.includes(id)) {
+            round.finishedAppraisers.push(id);
+          }
+        });
+        round.currentAppraiserId = undefined;
+        // 自动进入发言阶段
+        enterDiscussPhase(room);
+        round.events.push('全员鉴宝完毕，进入发言环节。');
+      }
+    }
+    return { ok: true };
+  }
+
+  round.currentAppraiserId = nextPlayerId;
+  return { ok: true };
+}
+
+/** 检查鉴宝阶段是否所有人已完成 */
+export function isAppraiseDone(room: Room): boolean {
+  const round = room.game.rounds[room.game.currentRound - 1];
+  if (!round) return false;
+  return round.finishedAppraisers.length >= room.players.length;
 }
 
 /** 老朝奉使用颠倒乾坤 */
