@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局",
   "app_slug": "antique-game",
-  "version_description": "完成游戏UI押币揭示终局移动端适配并生成部署指南",
+  "version_description": "推送代码至GitHub并生成Render公网部署配置",
   "preview_type": "pc"
 }

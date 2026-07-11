@@ -32,17 +32,23 @@ export const createApp = (): Application => {
 
   // 生产环境：托管前端静态文件
   if (env.NODE_ENV === 'production') {
-    const staticDir = path.resolve(process.cwd(), '../frontend/dist')
-    if (fs.existsSync(staticDir)) {
+    // 尝试多个可能的路径
+    const candidates = [
+      path.resolve(process.cwd(), 'frontend/dist'),
+      path.resolve(process.cwd(), '../frontend/dist'),
+      path.resolve(__dirname, '../frontend/dist'),
+      path.resolve(__dirname, '../../frontend/dist'),
+    ]
+    const staticDir = candidates.find(p => fs.existsSync(p))
+    if (staticDir) {
       app.use(express.static(staticDir))
-      // SPA 回退：所有非 /api 请求返回 index.html
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api')) return next()
         res.sendFile(path.join(staticDir, 'index.html'))
       })
       console.log(`Static files served from ${staticDir}`)
     } else {
-      console.warn(`Static dir not found: ${staticDir}`)
+      console.warn(`Static dir not found. Tried: ${candidates.join(', ')}`)
     }
   }
 
