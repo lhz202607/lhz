@@ -167,6 +167,8 @@ export interface GameRound {
   /** 鉴宝行动顺序（所有玩家随机排列） */
   appraiseOrder: string[];
   finishedAppraisers: string[];
+  /** 投票明细（投票结束后记录每位玩家投了哪些兽首） */
+  playerVotes?: Record<string, number[]>;
 }
 
 export interface GameState {
@@ -265,7 +267,7 @@ export interface PublicRoom {
     /** 鉴人环节投票状态 */
     identifyVotes: Record<string, string>;
     /** 历史轮次数据（行动顺序等） */
-    rounds: { appraiseOrder: string[]; finishedAppraisers: string[] }[];
+    rounds: { appraiseOrder: string[]; finishedAppraisers: string[]; playerVotes?: Record<string, number[]> }[];
   };
 }
 

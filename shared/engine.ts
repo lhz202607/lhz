@@ -367,7 +367,8 @@ export function resolveBets(room: Room): void {
   room.game.phase = 'reveal';
 
   const entries = Object.entries(round.betCounts).map(([id, count]) => ({ artifactId: Number(id), count }));
-  entries.sort((a, b) => b.count - a.count);
+  // 排序：票数降序，票数相同时按兽首 ID 降序（生肖排序靠后的优先）
+  entries.sort((a, b) => b.count - a.count || b.artifactId - a.artifactId);
 
   if (entries.length === 0) { round.events.push('本轮无人押币。'); return; }
 
@@ -387,6 +388,12 @@ export function resolveBets(room: Room): void {
       room.game.xuyuanScore += 1;
       round.events.push('揭露真品，许愿阵营 +1 分。');
     }
+  }
+
+  // 记录每位玩家投票明细，供前端展示
+  round.playerVotes = {};
+  for (const p of room.players) {
+    round.playerVotes[p.id] = [...(p.betArtifactIds || [])];
   }
 }
 

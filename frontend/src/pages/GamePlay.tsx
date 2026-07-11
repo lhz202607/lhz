@@ -359,9 +359,13 @@ function ZodiacBoard({ room, game }: { room: any; game: any }) {
     return <div className="card-antique p-8 text-center text-ivory-dim">等待开局…</div>;
   }
 
-  const isReveal = g.phase === 'reveal';
+  const isReveal = g.phase === 'reveal' || g.phase === 'ended';
   const me = game.me;
   const myRole = game.myRole;
+
+  // 获取当前轮的投票明细
+  const currentRoundData = (g.rounds || [])[g.currentRound - 1];
+  const playerVotes: Record<string, number[]> = currentRoundData?.playerVotes || {};
 
   return (
     <div className="card-antique p-4">
@@ -374,32 +378,94 @@ function ZodiacBoard({ room, game }: { room: any; game: any }) {
         </div>
       </div>
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-        {g.revealedArtifacts.length > 0 ? g.revealedArtifacts.map((a: any) => (
-          <ZodiacTile
-            key={a.id}
-            name={a.name}
-            state={
-              a.hidden ? 'hidden' :
-              a.isReal === true ? 'real' :
-              a.isReal === false ? 'fake' :
-              'normal'
-            }
-            betCount={a.betCount}
-          />
-        )) : g.artifacts.map((a: any) => {
-          const myAppraisal = game.myAppraisals[g.currentRound]?.find((r: any) => r.artifactId === a.id);
-          return (
-            <ZodiacTile
-              key={a.id}
-              name={a.name}
-              state={a.locked ? 'locked' : myAppraisal ? (myAppraisal.appearsReal ? 'appraised-real' : 'appraised-fake') : 'normal'}
-              myView={myAppraisal?.appearsReal}
-              showMyView={!!myAppraisal}
-            />
-          );
-        })}
+        {g.revealedArtifacts.length > 0
+          ? g.revealedArtifacts.map((a: any) => {
+              // 找到投了这个兽首的玩家
+              const voters = Object.entries(playerVotes)
+                .filter(([_, votes]) => (votes as number[]).includes(a.id))
+                .map(([pid]) => room.players.find((p: any) => p.id === pid))
+                .filter(Boolean);
+              return (
+                <div key={a.id} className="zodiac-card aspect-[3/4] flex flex-col items-center justify-center p-2 relative overflow-hidden">
+                  <ZodiacTileInner
+                    name={a.name}
+                    state={
+                      a.hidden ? 'hidden' :
+                      a.isReal === true ? 'real' :
+                      a.isReal === false ? 'fake' :
+                      'normal'
+                    }
+                    betCount={a.betCount}
+                  />
+                  {/* 投票玩家列表 */}
+                  {voters.length > 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
+                      <div className="flex flex-wrap gap-0.5 justify-center">
+                        {voters.map((p: any) => (
+                          <span key={p.id} className="text-[8px] text-gold-glow truncate max-w-[40px]" title={p.name}>
+                            {p.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          : g.artifacts.map((a: any) => {
+              const myAppraisal = game.myAppraisals[g.currentRound]?.find((r: any) => r.artifactId === a.id);
+              return (
+                <ZodiacTile
+                  key={a.id}
+                  name={a.name}
+                  state={a.locked ? 'locked' : myAppraisal ? (myAppraisal.appearsReal ? 'appraised-real' : 'appraised-fake') : 'normal'}
+                  myView={myAppraisal?.appearsReal}
+                  showMyView={!!myAppraisal}
+                />
+              );
+            })
+        }
       </div>
     </div>
+  );
+}
+
+function ZodiacTileInner({ name, state, betCount, myView, showMyView }: {
+  name: string;
+  state: 'normal' | 'locked' | 'real' | 'fake' | 'hidden' | 'appraised-real' | 'appraised-fake';
+  betCount?: number;
+  myView?: boolean;
+  showMyView?: boolean;
+}) {
+  const cls = {
+    normal: '',
+    locked: 'locked',
+    real: 'revealed-real',
+    fake: 'revealed-fake',
+    hidden: 'hidden-card',
+    'appraised-real': 'selected',
+    'appraised-fake': 'selected',
+  }[state];
+
+  return (
+    <>
+      <div className="font-brush text-2xl text-bronze mb-0.5">{name[0]}</div>
+      <div className="text-[10px] text-ivory-dim">{name[1]}</div>
+      {state === 'locked' && <Lock className="w-3 h-3 text-vermilion mt-1" />}
+      {showMyView && (
+        <div className={`text-[10px] mt-1 ${myView ? 'text-jade' : 'text-vermilion'}`}>
+          {myView ? '似真' : '似假'}
+        </div>
+      )}
+      {betCount !== undefined && betCount > 0 && (
+        <div className="text-[10px] text-gold-glow mt-1 flex items-center gap-0.5">
+          <Coins className="w-2.5 h-2.5" /> {betCount}
+        </div>
+      )}
+      {state === 'real' && <div className="text-[10px] text-jade mt-1 font-bold">真品</div>}
+      {state === 'fake' && <div className="text-[10px] text-vermilion mt-1 font-bold">赝品</div>}
+      {state === 'hidden' && <div className="text-[10px] text-ivory-dim mt-1">已隐</div>}
+    </>
   );
 }
 
@@ -422,22 +488,7 @@ function ZodiacTile({ name, state, betCount, myView, showMyView }: {
 
   return (
     <div className={`zodiac-card ${cls} aspect-[3/4] flex flex-col items-center justify-center p-2`}>
-      <div className="font-brush text-2xl text-bronze mb-0.5">{name[0]}</div>
-      <div className="text-[10px] text-ivory-dim">{name[1]}</div>
-      {state === 'locked' && <Lock className="w-3 h-3 text-vermilion mt-1" />}
-      {showMyView && (
-        <div className={`text-[10px] mt-1 ${myView ? 'text-jade' : 'text-vermilion'}`}>
-          {myView ? '似真' : '似假'}
-        </div>
-      )}
-      {betCount !== undefined && betCount > 0 && (
-        <div className="text-[10px] text-gold-glow mt-1 flex items-center gap-0.5">
-          <Coins className="w-2.5 h-2.5" /> {betCount}
-        </div>
-      )}
-      {state === 'real' && <div className="text-[10px] text-jade mt-1 font-bold">真品</div>}
-      {state === 'fake' && <div className="text-[10px] text-vermilion mt-1 font-bold">赝品</div>}
-      {state === 'hidden' && <div className="text-[10px] text-ivory-dim mt-1">已隐</div>}
+      <ZodiacTileInner name={name} state={state} betCount={betCount} myView={myView} showMyView={showMyView} />
     </div>
   );
 }
@@ -535,6 +586,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const roleInfo = myRole ? ROLE_INFO[myRole as any] : null;
   const myAppraisals = game.myAppraisals[g.currentRound] || [];
   const sealedRound = game.sealedRounds.includes(g.currentRound);
+  const [turnEnded, setTurnEnded] = useState(false);
 
   if (!roleInfo) return <div className="card-antique p-4">等待角色分配…</div>;
 
@@ -544,12 +596,21 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const isMyTurn = g.currentAppraiserId === me.id;
   const finishedAppraisers = g.finishedAppraisers || [];
 
-  // 判断我是否已经完成鉴宝（次数用完或无法鉴宝）
-  const hasFinishedAppraise = !canAppraise || remaining <= 0;
+  // 判断鉴宝是否完成（次数用完或无法鉴宝）
+  const appraiseDone = !canAppraise || remaining <= 0;
+
+  // 当不再是当前鉴宝者时，重置状态
+  useEffect(() => {
+    if (!isMyTurn) setTurnEnded(false);
+  }, [isMyTurn]);
 
   const handleAppraise = (artifactId: number) => {
     if (remaining <= 0) { toast.error('本轮鉴宝次数已用完'); return; }
     send({ type: 'appraise', artifactId });
+  };
+
+  const handleEndTurn = () => {
+    setTurnEnded(true);
   };
 
   const handlePassTurn = (nextPlayerId: string) => {
@@ -583,11 +644,11 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
         </div>
       )}
 
-      {/* 技能操作区 */}
-      {isMyTurn && <SkillPanel room={room} game={game} />}
+      {/* 技能操作区（回合结束前可见） */}
+      {isMyTurn && !turnEnded && <SkillPanel room={room} game={game} />}
 
-      {/* 兽首选择鉴宝 */}
-      {isMyTurn && canAppraise && remaining > 0 && (
+      {/* 兽首选择鉴宝（回合结束前可见） */}
+      {isMyTurn && !turnEnded && canAppraise && remaining > 0 && (
         <div>
           <div className="text-ivory-dim text-sm mb-2">点击兽首进行鉴定：</div>
           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
@@ -611,32 +672,45 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
         </div>
       )}
 
-      {/* 无法鉴宝弹窗提示 */}
-      {isMyTurn && hasFinishedAppraise && !canAppraise && !sealedRound && (
-        <div className="bg-vermilion/10 border border-vermilion/30 rounded-md p-3 animate-float-in">
-          <div className="text-vermilion text-sm font-bold mb-1">本回合无法鉴宝</div>
-          <div className="text-ivory-dim text-xs mb-3">
-            {roleInfo.appraiseCount === 0
-              ? '你的角色不擅鉴宝，使用技能后请指定下一位玩家。'
-              : '你的鉴宝次数已用完，请指定下一位玩家。'}
+      {/* 是否发动技能提示 + 结束回合按钮 */}
+      {isMyTurn && !turnEnded && (
+        <div className="bg-bronze/5 border border-bronze/20 rounded-md p-3">
+          <div className="text-ivory-dim text-xs mb-2">
+            完成鉴宝和技能操作后，请点击"结束回合"按钮。
+            {roleInfo.id === 'fangzhen' && ' 是否已发动【明察秋毫】技能？'}
+            {roleInfo.id === 'yaoburan' && ' 是否已发动【封印之术】技能？'}
+            {roleInfo.id === 'zhengguoqu' && ' 是否已发动【封存兽首】技能？'}
+            {roleInfo.id === 'laochaofeng' && ' 是否已发动【颠倒乾坤】技能？'}
           </div>
+          <Button onClick={handleEndTurn} className="btn-bronze w-full h-10">
+            结束回合
+          </Button>
+        </div>
+      )}
+
+      {/* 回合结束后的操作区 */}
+      {isMyTurn && turnEnded && (
+        <>
+          {/* 无法鉴宝弹窗提示 */}
+          {appraiseDone && !canAppraise && !sealedRound && (
+            <div className="bg-vermilion/10 border border-vermilion/30 rounded-md p-3 animate-float-in">
+              <div className="text-vermilion text-sm font-bold mb-1">本回合无法鉴宝</div>
+              <div className="text-ivory-dim text-xs mb-3">
+                {roleInfo.appraiseCount === 0
+                  ? '你的角色不擅鉴宝，请指定下一位玩家。'
+                  : '你的鉴宝次数已用完，请指定下一位玩家。'}
+              </div>
+            </div>
+          )}
+
+          {/* 传递回合面板 */}
           <PassTurnPanel
             room={room}
             game={game}
             finishedAppraisers={finishedAppraisers}
             onPass={handlePassTurn}
           />
-        </div>
-      )}
-
-      {/* 完成鉴宝后指定下一位 */}
-      {isMyTurn && hasFinishedAppraise && canAppraise && (
-        <PassTurnPanel
-          room={room}
-          game={game}
-          finishedAppraisers={finishedAppraisers}
-          onPass={handlePassTurn}
-        />
+        </>
       )}
 
       {/* 完成鉴宝按钮（房主） */}

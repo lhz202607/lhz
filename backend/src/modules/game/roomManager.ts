@@ -140,6 +140,7 @@ class RoomManager {
         rounds: room.game.rounds.map(r => ({
           appraiseOrder: r.appraiseOrder,
           finishedAppraisers: r.finishedAppraisers,
+          playerVotes: r.playerVotes,
         })),
       },
     };
