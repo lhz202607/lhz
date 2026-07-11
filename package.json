@@ -1,0 +1,15 @@
+{
+  "name": "antique-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "古董局中局·十二兽首 多人在线桌游",
+  "scripts": {
+    "build:frontend": "cd frontend && pnpm install && pnpm build",
+    "build:backend": "cd backend && pnpm install && pnpm build",
+    "build": "pnpm build:frontend && pnpm build:backend",
+    "start": "node backend/dist/src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

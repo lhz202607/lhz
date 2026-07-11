@@ -3,8 +3,8 @@ services:
     name: antique-game
     runtime: node
     plan: free
-    buildCommand: pnpm install && cd frontend && pnpm install && pnpm build && cd ../backend && pnpm build
-    startCommand: node backend/dist/src/index.js
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
     envVars:
       - key: NODE_ENV
         value: production
