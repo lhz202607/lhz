@@ -92,7 +92,7 @@ export function assignRoles(room: Room): void {
     p.yaoburanSealTarget = undefined; p.zhengguoquLockedArtifact = undefined;
     p.laochaofengUsedFlip = false;
     p.speech = undefined; p.hasSpoken = false;
-    p.betArtifactIds = []; p.remainingVotes = 2;
+    p.betArtifactIds = []; p.remainingVotes = 0;
     p.identifyTargetId = undefined;
   });
   room.game.playerRoundStates = {};
@@ -124,7 +124,17 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
   artifacts.forEach(a => usedArtifactIds.add(a.id));
 
   const speechOrder = shuffle(room.players.map(p => p.id));
-  const appraiseOrder = shuffle(room.players.map(p => p.id));
+
+  // 行动顺序：上一轮末位玩家自动成为本轮首位，其余随机
+  let appraiseOrder: string[];
+  const prevRound = game.rounds[roundNumber - 2]; // 上一轮（如果有）
+  if (prevRound?.appraiseOrder && prevRound.appraiseOrder.length > 0) {
+    const lastAppraiser = prevRound.appraiseOrder[prevRound.appraiseOrder.length - 1];
+    const others = shuffle(room.players.map(p => p.id).filter(id => id !== lastAppraiser));
+    appraiseOrder = [lastAppraiser, ...others];
+  } else {
+    appraiseOrder = shuffle(room.players.map(p => p.id));
+  }
   const firstAppraiser = appraiseOrder[0];
 
   const round: GameRound = {
@@ -143,8 +153,9 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
     p.laochaofengUsedFlip = false;
     p.speech = undefined; p.hasSpoken = false;
     p.betArtifactIds = [];
-    // 每轮补充 2 票
+    // 每轮重置为 2 票（加上上一轮未用完的）
     p.remainingVotes = (p.remainingVotes || 0) + 2;
+    p.finishedVote = false;
   });
 
   const skipPlayers = room.players.filter(p => p.role === 'huangyanyan' || p.role === 'muhujianai');
@@ -318,17 +329,16 @@ export function enterVotePhase(room: Room): void {
   round.phase = 'vote';
   room.game.phase = 'vote';
   round.betCounts = {};
-  room.players.forEach(p => { p.betArtifactIds = []; });
+  room.players.forEach(p => { p.betArtifactIds = []; p.finishedVote = false; });
 }
 
-/** 玩家押币（支持多票） */
+/** 玩家押币（支持多票，可投同一兽首） */
 export function playerBet(room: Room, playerId: string, artifactId: number): { ok: boolean; error?: string } {
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round || round.phase !== 'vote') return { ok: false, error: '当前非押币阶段' };
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { ok: false, error: '玩家不存在' };
   if (player.remainingVotes <= 0) return { ok: false, error: '本轮投票次数已用完' };
-  if (player.betArtifactIds.includes(artifactId)) return { ok: false, error: '已押过该兽首' };
   const artifact = round.artifacts.find(a => a.id === artifactId);
   if (!artifact) return { ok: false, error: '兽首不存在' };
   player.betArtifactIds.push(artifactId);
@@ -337,8 +347,17 @@ export function playerBet(room: Room, playerId: string, artifactId: number): { o
   return { ok: true };
 }
 
+/** 玩家手动结束投票（未用完的票顺延至下一轮） */
+export function finishVoteForPlayer(room: Room, playerId: string): { ok: boolean; error?: string } {
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return { ok: false, error: '玩家不存在' };
+  if (room.game.phase !== 'vote') return { ok: false, error: '当前非押币阶段' };
+  player.finishedVote = true;
+  return { ok: true };
+}
+
 export function isVoteDone(room: Room): boolean {
-  return room.players.every(p => p.remainingVotes <= 0 || p.isAI);
+  return room.players.every(p => p.remainingVotes <= 0 || p.finishedVote || p.isAI);
 }
 
 export function resolveBets(room: Room): void {
@@ -466,6 +485,14 @@ export function resolveIdentify(room: Room): void {
   }
 
   log.push(`许愿阵营最终得分：${game.xuyuanScore} / ${game.targetScore}`);
+
+  // 公布每位玩家指认票型
+  log.push('—— 指认票型 ——');
+  for (const p of room.players) {
+    const targetId = game.identifyVotes[p.id];
+    const targetName = targetId ? room.players.find(t => t.id === targetId)?.name || '未知' : '未投票';
+    log.push(`VOTE:${p.id}:${p.name}:${targetName}`);
+  }
 
   if (game.xuyuanScore >= game.targetScore) {
     game.winner = 'xuyuan';

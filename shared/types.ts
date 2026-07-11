@@ -143,6 +143,8 @@ export interface Player {
   betArtifactIds: number[];
   /** 本轮剩余投票次数 */
   remainingVotes: number;
+  /** 玩家手动结束投票（未用完票数顺延） */
+  finishedVote?: boolean;
   /** 鉴人环节的投票目标 */
   identifyTargetId?: string;
 }
@@ -208,6 +210,7 @@ export type ClientMessage =
   | { type: 'passAppraiseTurn'; nextPlayerId: string }
   | { type: 'speech'; content: string }
   | { type: 'bet'; artifactId: number }
+  | { type: 'finishVote' }  // 玩家结束投票
   | { type: 'nextRound' }
   | { type: 'identifyVote'; targetId: string }  // 鉴人环节投票
   | { type: 'disbandRoom' }
@@ -231,6 +234,8 @@ export interface PublicPlayer {
   hasSpoken?: boolean;
   betArtifactIds?: number[];
   visiblySealed?: boolean;
+  /** 是否已完成投票 */
+  finishedVote?: boolean;
   /** 鉴人环节的投票目标 */
   identifyTargetId?: string;
 }
@@ -259,6 +264,8 @@ export interface PublicRoom {
     appraiseOrder: string[];
     /** 鉴人环节投票状态 */
     identifyVotes: Record<string, string>;
+    /** 历史轮次数据（行动顺序等） */
+    rounds: { appraiseOrder: string[]; finishedAppraisers: string[] }[];
   };
 }
 

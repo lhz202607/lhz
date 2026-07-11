@@ -83,11 +83,14 @@ class RoomManager {
 
     const players: PublicPlayer[] = room.players.map(p => {
       const rs = room.game.playerRoundStates[p.id]?.[room.game.currentRound];
+      // 封印可见性：只有药不然本人和被封印者可见
+      const isSealedViewer = viewerId === p.id || (viewerId && room.players.find(pl => pl.id === viewerId)?.role === 'yaoburan');
       return {
         id: p.id, name: p.name, isHost: p.isHost, isAI: p.isAI, connected: p.connected,
         hasSpoken: p.hasSpoken,
         betArtifactIds: (room.game.phase === 'vote' || room.game.phase === 'reveal' || room.game.phase === 'ended') ? p.betArtifactIds : undefined,
-        visiblySealed: rs?.sealed,
+        visiblySealed: isSealedViewer ? rs?.sealed : undefined,
+        finishedVote: p.finishedVote,
         role: (room.game.phase === 'ended' || isIdentify) ? p.role : undefined,
         identifyTargetId: isIdentify ? p.identifyTargetId : undefined,
       };
@@ -134,6 +137,10 @@ class RoomManager {
         finishedAppraisers: round?.finishedAppraisers || [],
         appraiseOrder,
         identifyVotes: room.game.identifyVotes || {},
+        rounds: room.game.rounds.map(r => ({
+          appraiseOrder: r.appraiseOrder,
+          finishedAppraisers: r.finishedAppraisers,
+        })),
       },
     };
   }

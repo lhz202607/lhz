@@ -273,6 +273,11 @@ export default function GamePlay() {
               </div>
             )}
 
+            {/* 行动顺序 */}
+            {(g.phase === 'appraise' || g.phase === 'discuss' || g.phase === 'vote' || g.phase === 'reveal') && (
+              <AppraiseOrderPanel room={room} game={game} />
+            )}
+
             {/* 事件日志 */}
             <div className="card-antique p-4">
               <div className="text-bronze font-antique font-bold mb-2 text-sm flex items-center gap-1">
@@ -606,8 +611,26 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
         </div>
       )}
 
+      {/* 无法鉴宝弹窗提示 */}
+      {isMyTurn && hasFinishedAppraise && !canAppraise && !sealedRound && (
+        <div className="bg-vermilion/10 border border-vermilion/30 rounded-md p-3 animate-float-in">
+          <div className="text-vermilion text-sm font-bold mb-1">本回合无法鉴宝</div>
+          <div className="text-ivory-dim text-xs mb-3">
+            {roleInfo.appraiseCount === 0
+              ? '你的角色不擅鉴宝，使用技能后请指定下一位玩家。'
+              : '你的鉴宝次数已用完，请指定下一位玩家。'}
+          </div>
+          <PassTurnPanel
+            room={room}
+            game={game}
+            finishedAppraisers={finishedAppraisers}
+            onPass={handlePassTurn}
+          />
+        </div>
+      )}
+
       {/* 完成鉴宝后指定下一位 */}
-      {isMyTurn && hasFinishedAppraise && (
+      {isMyTurn && hasFinishedAppraise && canAppraise && (
         <PassTurnPanel
           room={room}
           game={game}
@@ -630,6 +653,59 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// 行动顺序面板（显示当前轮及历史轮次）
+// ============================================================
+function AppraiseOrderPanel({ room, game }: { room: any; game: any }) {
+  const g = room.game;
+  const currentRound = g.currentRound;
+
+  return (
+    <div className="card-antique p-3">
+      <div className="text-bronze font-antique font-bold mb-2 text-sm flex items-center gap-1">
+        <Target className="w-4 h-4" /> 行动顺序
+      </div>
+      {[1, 2, 3].map(roundNum => {
+        // 尝试获取该轮数据
+        const roundData = roundNum <= currentRound ? (g.rounds || [])[roundNum - 1] : null;
+        const order = roundData?.appraiseOrder || (roundNum === currentRound ? g.appraiseOrder : null);
+        if (!order || order.length === 0) return null;
+        const isCurrent = roundNum === currentRound;
+
+        return (
+          <div key={roundNum} className={`mb-2 last:mb-0 ${!isCurrent ? 'opacity-60' : ''}`}>
+            <div className="text-ivory-dim text-[10px] mb-1 flex items-center gap-1">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-gold-glow' : 'bg-bronze/40'}`}></span>
+              第{roundNum}轮{isCurrent ? '（当前）' : ''}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {order.map((pid: string, idx: number) => {
+                const player = room.players.find((p: any) => p.id === pid);
+                const isFinished = roundData?.finishedAppraisers?.includes(pid);
+                const isCurrentAppraiser = isCurrent && g.currentAppraiserId === pid;
+                return (
+                  <div
+                    key={pid}
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
+                      isCurrentAppraiser ? 'bg-gold-glow/20 text-gold-glow border border-gold-glow/40' :
+                      isFinished ? 'bg-jade/10 text-jade/70' :
+                      'bg-black/20 text-ivory-dim'
+                    }`}
+                  >
+                    <span className="text-ivory-dim">#{idx + 1}</span>
+                    <span className="truncate max-w-[50px]">{player?.name || '?'}</span>
+                    {isCurrentAppraiser && <span className="text-[8px]">鉴宝中</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -840,17 +916,28 @@ function VotePanel({ room, game }: { room: any; game: any }) {
   const me = game.me;
   const myBets: number[] = me.betArtifactIds || [];
   const remainingVotes = game.remainingVotes || 0;
+  const voteFinished = me.finishedVote;
+  const allVoted = room.players.every((p: any) => p.finishedVote || p.betArtifactIds?.length === 0 || p.remainingVotes <= 0);
 
-  // 实时统计
+  // 投票结束前不显示票数统计，结束后显示
+  const showCounts = g.phase === 'reveal' || g.phase === 'ended';
+
+  // 统计票数（仅揭示阶段可见）
   const betCounts: Record<number, number> = {};
-  for (const p of room.players) {
-    const bets: number[] = p.betArtifactIds || [];
-    for (const id of bets) {
-      betCounts[id] = (betCounts[id] || 0) + 1;
+  if (showCounts) {
+    for (const p of room.players) {
+      const bets: number[] = p.betArtifactIds || [];
+      for (const id of bets) {
+        betCounts[id] = (betCounts[id] || 0) + 1;
+      }
     }
   }
   const totalBets = Object.values(betCounts).reduce((a, b) => a + b, 0);
   const maxBet = Math.max(1, ...Object.values(betCounts));
+
+  // 已投票玩家列表
+  const votedPlayers = room.players.filter((p: any) => p.finishedVote || (p.betArtifactIds?.length || 0) > 0);
+  const totalPlayers = room.players.length;
 
   return (
     <div className="card-antique p-4 space-y-3">
@@ -863,15 +950,18 @@ function VotePanel({ room, game }: { room: any; game: any }) {
         </div>
       </div>
       <div className="text-ivory-dim text-sm leading-relaxed">
-        {remainingVotes <= 0
-          ? '你的投票次数已用完，等待其他玩家…'
-          : `每轮 2 票，可投不同兽首。押币最多者将被隐藏，第二多者予以揭露。`}
+        {voteFinished
+          ? '你已完成投票，等待其他玩家…'
+          : remainingVotes <= 0
+          ? '你的投票次数已用完，请点击结束投票'
+          : `每轮 2 票，可投同一兽首多票。押币最多者将被隐藏，第二多者予以揭露。`}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {g.artifacts.map((a: any) => {
           const count = betCounts[a.id] || 0;
-          const isMyBet = myBets.includes(a.id);
+          const myBetCount = myBets.filter(id => id === a.id).length;
+          const isMyBet = myBetCount > 0;
           const isTopBet = count === maxBet && count > 0;
           return (
             <button
@@ -880,34 +970,51 @@ function VotePanel({ room, game }: { room: any; game: any }) {
               className={`zodiac-card aspect-[3/4] flex flex-col items-center justify-center p-2 relative ${
                 isMyBet ? 'selected' : ''
               } ${a.locked ? 'locked' : ''}`}
-              disabled={a.locked || isMyBet || remainingVotes <= 0}
+              disabled={a.locked || voteFinished || remainingVotes <= 0}
             >
               <div className="font-brush text-2xl text-bronze mb-0.5">{a.name[0]}</div>
               <div className="text-[10px] text-ivory-dim">{a.name[1]}</div>
-              <div className={`mt-1 flex items-center gap-0.5 text-[11px] font-bold ${
-                isTopBet ? 'text-gold-glow' : 'text-ivory-dim'
-              }`}>
-                <Coins className="w-3 h-3" />{count}
-              </div>
-              {count > 0 && (
+              {showCounts && (
+                <div className={`mt-1 flex items-center gap-0.5 text-[11px] font-bold ${
+                  isTopBet ? 'text-gold-glow' : 'text-ivory-dim'
+                }`}>
+                  <Coins className="w-3 h-3" />{count}
+                </div>
+              )}
+              {showCounts && count > 0 && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30 rounded-b overflow-hidden">
                   <div className={`h-full ${isTopBet ? 'bg-gold-glow' : 'bg-bronze'}`}
                     style={{ width: `${(count / maxBet) * 100}%` }} />
                 </div>
               )}
               {isMyBet && (
-                <div className="absolute top-1 right-1 text-[9px] text-gold-glow font-bold bg-black/50 rounded px-1">我</div>
+                <div className="absolute top-1 right-1 text-[9px] text-gold-glow font-bold bg-black/50 rounded px-1">
+                  {myBetCount > 1 ? `x${myBetCount}` : '我'}
+                </div>
               )}
             </button>
           );
         })}
       </div>
 
+      {/* 结束投票按钮 */}
+      {!voteFinished && (
+        <div className="pt-2 border-t border-bronze/20">
+          <Button
+            onClick={() => send({ type: 'finishVote' })}
+            className="btn-bronze w-full h-10"
+          >
+            {remainingVotes > 0 ? `结束投票（剩余 ${remainingVotes} 票顺延至下轮）` : '结束投票'}
+          </Button>
+        </div>
+      )}
+
+      {/* 投票进度 */}
       <div className="flex items-center gap-2 text-xs text-ivory-dim">
         <div className="flex-1 bg-black/30 rounded-full h-2 overflow-hidden">
-          <div className="h-full bg-bronze" style={{ width: `${Math.min(100, (totalBets / (room.players.length * 2)) * 100)}%` }} />
+          <div className="h-full bg-bronze" style={{ width: `${(votedPlayers.length / totalPlayers) * 100}%` }} />
         </div>
-        <span>总 {totalBets} 票</span>
+        <span>{votedPlayers.length} / {totalPlayers} 已投票</span>
       </div>
     </div>
   );
@@ -1249,13 +1356,28 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
         <>
           <div className="text-bronze font-antique font-bold mb-2 text-sm">终局纪事</div>
           <div className="text-left max-w-md mx-auto space-y-1.5 mb-6 bg-black/20 p-3 rounded-md max-h-60 overflow-y-auto">
-            {g.endLog.map((line: string, i: number) => (
-              <div key={i} className={`text-xs leading-relaxed border-l-2 pl-2 ${
-                line.includes('+') ? 'text-jade border-jade/30' :
-                line.includes('老朝奉') || line.includes('败') ? 'text-vermilion border-vermilion/30' :
-                'text-ivory-dim border-bronze/30'
-              }`}>{line}</div>
-            ))}
+            {g.endLog.map((line: string, i: number) => {
+              // 解析指认票型行
+              if (line.startsWith('VOTE:')) {
+                const parts = line.split(':');
+                const voterName = parts[2] || '';
+                const targetName = parts[3] || '';
+                return (
+                  <div key={i} className="text-xs leading-relaxed border-l-2 pl-2 text-ivory border-bronze/30 flex items-center gap-1.5">
+                    <span className="text-ivory-dim">{voterName}</span>
+                    <span className="text-ivory-dim">→</span>
+                    <span className="text-gold-glow font-bold">{targetName}</span>
+                  </div>
+                );
+              }
+              return (
+                <div key={i} className={`text-xs leading-relaxed border-l-2 pl-2 ${
+                  line.includes('+') ? 'text-jade border-jade/30' :
+                  line.includes('老朝奉') || line.includes('败') ? 'text-vermilion border-vermilion/30' :
+                  'text-ivory-dim border-bronze/30'
+                }`}>{line}</div>
+              );
+            })}
           </div>
           <div className="divider-antique"></div>
         </>
