@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局十二兽首",
   "app_slug": "antique-game",
-  "version_description": "修复队友显示和投票明细优化",
+  "version_description": "修复并列第一票数兽首揭示规则",
   "preview_type": "pc"
 }

@@ -367,26 +367,58 @@ export function resolveBets(room: Room): void {
   room.game.phase = 'reveal';
 
   const entries = Object.entries(round.betCounts).map(([id, count]) => ({ artifactId: Number(id), count }));
-  // 排序：票数降序，票数相同时按兽首 ID 升序（生肖靠前的隐藏，靠后的揭示）
-  entries.sort((a, b) => b.count - a.count || a.artifactId - b.artifactId);
 
   if (entries.length === 0) { round.events.push('本轮无人押币。'); return; }
 
-  const hiddenId = entries[0].artifactId;
-  round.hiddenArtifactId = hiddenId;
-  const hiddenArtifact = round.artifacts.find(a => a.id === hiddenId)!;
-  round.events.push(`【${hiddenArtifact.name}】获得最多押币，已被隐藏。`);
+  // 找到最高票数
+  const maxCount = Math.max(...entries.map(e => e.count));
+  // 所有最高票数的兽首（并列第一）
+  const topEntries = entries.filter(e => e.count === maxCount);
+  // 其余兽首（非第一）
+  const restEntries = entries.filter(e => e.count < maxCount);
 
-  if (entries.length >= 2) {
-    const revealedId = entries[1].artifactId;
-    round.revealedArtifactId = revealedId;
-    const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
+  if (topEntries.length >= 2) {
+    // 并列第一：按生肖 ID 升序排序，靠后的揭示，其余隐藏
+    topEntries.sort((a, b) => a.artifactId - b.artifactId);
+    // 最后一个（生肖最靠后）揭示
+    const revealedEntry = topEntries[topEntries.length - 1];
+    // 其余全部隐藏
+    for (let i = 0; i < topEntries.length - 1; i++) {
+      const hiddenArtifact = round.artifacts.find(a => a.id === topEntries[i].artifactId)!;
+      round.events.push(`【${hiddenArtifact.name}】获得最多押币（${maxCount}票），已被隐藏。`);
+    }
+    round.hiddenArtifactId = topEntries[0].artifactId;
+
+    const revealedArtifact = round.artifacts.find(a => a.id === revealedEntry.artifactId)!;
     const revealedIsReal = revealedArtifact.isReal;
+    round.revealedArtifactId = revealedEntry.artifactId;
     round.revealedIsReal = revealedIsReal;
-    round.events.push(`【${revealedArtifact.name}】予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
+    round.events.push(`【${revealedArtifact.name}】并列最多押币（${maxCount}票），按生肖排序靠后，予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
     if (revealedIsReal) {
       room.game.xuyuanScore += 1;
       round.events.push('揭露真品，许愿阵营 +1 分。');
+    }
+  } else {
+    // 无并列第一：最高票隐藏，第二高揭示
+    // 排序：票数降序，票数相同时按 ID 升序
+    entries.sort((a, b) => b.count - a.count || a.artifactId - b.artifactId);
+
+    const hiddenId = entries[0].artifactId;
+    round.hiddenArtifactId = hiddenId;
+    const hiddenArtifact = round.artifacts.find(a => a.id === hiddenId)!;
+    round.events.push(`【${hiddenArtifact.name}】获得最多押币，已被隐藏。`);
+
+    if (entries.length >= 2) {
+      const revealedId = entries[1].artifactId;
+      round.revealedArtifactId = revealedId;
+      const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
+      const revealedIsReal = revealedArtifact.isReal;
+      round.revealedIsReal = revealedIsReal;
+      round.events.push(`【${revealedArtifact.name}】予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
+      if (revealedIsReal) {
+        room.game.xuyuanScore += 1;
+        round.events.push('揭露真品，许愿阵营 +1 分。');
+      }
     }
   }
 
