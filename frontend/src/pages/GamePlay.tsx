@@ -725,9 +725,32 @@ function SkillPanel({ room, game }: { room: any; game: any }) {
 
   // 方震：查验阵营
   if (myRole === 'fangzhen') {
-    const checked = game.fangzhenResults.find((r: any) => r.round === g.currentRound);
-    const targets = room.players.filter((p: any) => p.id !== me.id);
-    return (
+    return <FangzhenSkillPanel room={room} game={game} me={me} g={g} />;
+  }
+
+  return null;
+}
+
+// ============================================================
+// 方震技能面板（独立组件，支持 useEffect 弹窗）
+// ============================================================
+function FangzhenSkillPanel({ room, game, me, g }: { room: any; game: any; me: any; g: any }) {
+  const [showPopup, setShowPopup] = useState(false);
+  const checked = game.fangzhenResults.find((r: any) => r.round === g.currentRound);
+  const targets = room.players.filter((p: any) => p.id !== me.id);
+
+  // 当查验结果出现时弹出弹窗
+  useEffect(() => {
+    if (checked) {
+      setShowPopup(true);
+    }
+  }, [checked?.round, checked?.targetId]);
+
+  const factionName = checked?.faction === 'xuyuan' ? '好人阵营（许愿）' : '坏人阵营（老朝奉）';
+  const factionColor = checked?.faction === 'xuyuan' ? 'text-jade border-jade' : 'text-vermilion border-vermilion';
+
+  return (
+    <>
       <div className="bg-black/20 p-3 rounded-md border border-bronze/20">
         <div className="text-sm text-bronze font-bold mb-1 flex items-center gap-1">
           <Eye className="w-4 h-4" /> 明察秋毫
@@ -754,10 +777,28 @@ function SkillPanel({ room, game }: { room: any; game: any }) {
           </div>
         )}
       </div>
-    );
-  }
 
-  return null;
+      {/* 查验结果弹窗 */}
+      {showPopup && checked && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowPopup(false)}>
+          <div className="card-antique p-6 max-w-xs w-full mx-4 text-center animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <div className="text-bronze font-antique font-bold text-sm mb-3">明察秋毫 · 查验结果</div>
+            <Eye className="w-10 h-10 mx-auto mb-3 text-gold-glow" />
+            <div className="text-ivory font-brush text-2xl mb-2">{checked.targetName}</div>
+            <div className={`text-lg font-bold px-4 py-2 rounded border-2 ${factionColor} bg-black/30`}>
+              {factionName}
+            </div>
+            <button
+              onClick={() => setShowPopup(false)}
+              className="mt-4 btn-ghost px-4 py-1.5 text-xs rounded"
+            >
+              知道了
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ============================================================
