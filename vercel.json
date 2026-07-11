@@ -1,0 +1,19 @@
+{
+  "name": "antique-game",
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "cd frontend && pnpm install && pnpm build",
+        "outputDirectory": "frontend/dist"
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "http://your-backend.vercel.app/api/$1" },
+    { "src": "/(.*)", "dest": "/frontend/dist/$1" },
+    { "src": "/", "dest": "/frontend/dist/index.html" }
+  ]
+}

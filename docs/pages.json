@@ -1,0 +1,17 @@
+[
+  {
+    "pageKey": "Home",
+    "title": "首页",
+    "url": "/"
+  },
+  {
+    "pageKey": "Play",
+    "title": "游戏对局",
+    "url": "/play/:code"
+  },
+  {
+    "pageKey": "Room",
+    "title": "房间大厅",
+    "url": "/room/:code"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "project_type": "web",
+  "sub_project_type": "",
+  "name": "古董局中局",
+  "app_slug": "antique-game",
+  "version_description": "完成游戏UI押币揭示终局移动端适配并生成部署指南",
+  "preview_type": "pc"
+}
