@@ -536,10 +536,19 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const canAppraise = roleInfo.appraiseCount > 0 && !sealedRound;
   const appraisedCount = game.myAppraisals[g.currentRound]?.length || 0;
   const remaining = roleInfo.appraiseCount - appraisedCount;
+  const isMyTurn = g.currentAppraiserId === me.id;
+  const finishedAppraisers = g.finishedAppraisers || [];
+
+  // 判断我是否已经完成鉴宝（次数用完或无法鉴宝）
+  const hasFinishedAppraise = !canAppraise || remaining <= 0;
 
   const handleAppraise = (artifactId: number) => {
     if (remaining <= 0) { toast.error('本轮鉴宝次数已用完'); return; }
     send({ type: 'appraise', artifactId });
+  };
+
+  const handlePassTurn = (nextPlayerId: string) => {
+    send({ type: 'passAppraiseTurn', nextPlayerId });
   };
 
   return (
@@ -557,11 +566,23 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
         )}
       </div>
 
+      {/* 当前鉴宝者提示 */}
+      {isMyTurn && (
+        <div className="bg-gold-glow/10 border border-gold-glow/30 rounded-md px-3 py-2 text-gold-glow text-sm font-bold text-center">
+          轮到你鉴宝
+        </div>
+      )}
+      {!isMyTurn && g.currentAppraiserId && (
+        <div className="text-ivory-dim text-sm text-center">
+          当前鉴宝：<span className="text-bronze font-bold">{room.players.find((p: any) => p.id === g.currentAppraiserId)?.name || '—'}</span>
+        </div>
+      )}
+
       {/* 技能操作区 */}
-      <SkillPanel room={room} game={game} />
+      {isMyTurn && <SkillPanel room={room} game={game} />}
 
       {/* 兽首选择鉴宝 */}
-      {canAppraise && remaining > 0 && (
+      {isMyTurn && canAppraise && remaining > 0 && (
         <div>
           <div className="text-ivory-dim text-sm mb-2">点击兽首进行鉴定：</div>
           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
@@ -583,6 +604,16 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
             })}
           </div>
         </div>
+      )}
+
+      {/* 完成鉴宝后指定下一位 */}
+      {isMyTurn && hasFinishedAppraise && (
+        <PassTurnPanel
+          room={room}
+          game={game}
+          finishedAppraisers={finishedAppraisers}
+          onPass={handlePassTurn}
+        />
       )}
 
       {/* 完成鉴宝按钮（房主） */}
