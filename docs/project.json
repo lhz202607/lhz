@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局十二兽首",
   "app_slug": "antique-game",
-  "version_description": "Add kick player and fix appraise turn system",
+  "version_description": "新增鉴人环节与多票制规则",
   "preview_type": "pc"
 }

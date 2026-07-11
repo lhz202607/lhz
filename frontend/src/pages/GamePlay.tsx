@@ -5,7 +5,7 @@ import { ROLE_INFO } from '@/lib/game/roles';
 import { RoleId } from '@/shared/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Crown, Bot, Send, Lock, Eye, Sparkles, ScrollText, Coins } from 'lucide-react';
+import { Crown, Bot, Send, Lock, Eye, Sparkles, ScrollText, Coins, Users, Target, Vote } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function GamePlay() {
@@ -15,6 +15,8 @@ export default function GamePlay() {
   const pid = searchParams.get('pid') || undefined;
   const navigate = useNavigate();
   const game = useGameState();
+  const knownAllies = game.knownAllies || [];
+  const remainingVotes = game.remainingVotes || 0;
   const [connecting, setConnecting] = useState(true);
   const [speech, setSpeech] = useState('');
   const [showRoleCard, setShowRoleCard] = useState(false);
@@ -103,6 +105,7 @@ export default function GamePlay() {
                 const isCurrentSpeaker = g.phase === 'discuss' && g.speechOrder[g.currentSpeakerIndex] === p.id;
                 const isCurrentAppraiser = g.phase === 'appraise' && g.currentAppraiserId === p.id;
                 const hasFinishedAppraise = (g.finishedAppraisers || []).includes(p.id);
+                const appraiseIdx = (g.appraiseOrder || []).indexOf(p.id);
                 return (
                   <div
                     key={p.id}
@@ -123,6 +126,9 @@ export default function GamePlay() {
                           {p.isAI && <Bot className="w-3 h-3 text-ivory-dim shrink-0" />}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {g.phase === 'appraise' && appraiseIdx >= 0 && (
+                            <span className="text-[10px] text-ivory-dim">#{appraiseIdx + 1}</span>
+                          )}
                           {p.visiblySealed && (
                             <span className="text-[10px] text-vermilion flex items-center gap-0.5">
                               <Lock className="w-2.5 h-2.5" />被封
@@ -137,7 +143,7 @@ export default function GamePlay() {
                           {g.phase === 'appraise' && hasFinishedAppraise && !isCurrentAppraiser && (
                             <span className="text-[10px] text-jade">已鉴完</span>
                           )}
-                          {g.phase === 'vote' && p.betArtifactId !== undefined && (
+                          {g.phase === 'vote' && p.betArtifactIds !== undefined && p.betArtifactIds.length > 0 && (
                             <span className="text-[10px] text-jade flex items-center gap-0.5">
                               <Coins className="w-2.5 h-2.5" />已押
                             </span>
@@ -207,6 +213,25 @@ export default function GamePlay() {
                 <div className="text-xs text-ivory leading-relaxed bg-black/20 p-2 rounded">
                   {roleInfo.ability}
                 </div>
+
+                {/* 已知队友（老朝奉阵营） */}
+                {knownAllies.length > 0 && (
+                  <div className="mt-3 bg-vermilion/10 border border-vermilion/20 p-2 rounded">
+                    <div className="text-vermilion text-xs font-bold mb-1 flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> 已知队友
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {knownAllies.map((roleId: RoleId) => {
+                        const ally = (ROLE_INFO as any)[roleId];
+                        return (
+                          <span key={roleId} className="text-xs px-2 py-0.5 rounded-full bg-vermilion/20 text-vermilion">
+                            {ally?.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* 方震查验结果 */}
                 {myRole === 'fangzhen' && game.fangzhenResults.length > 0 && (
@@ -486,6 +511,11 @@ function PhaseAction({ room, game, speech, setSpeech }: { room: any; game: any; 
     return <RevealPanel room={room} game={game} />;
   }
 
+  // 鉴人阶段
+  if (g.phase === 'identify') {
+    return <IdentifyPanel room={room} game={game} />;
+  }
+
   return null;
 }
 
@@ -736,33 +766,40 @@ function SkillPanel({ room, game }: { room: any; game: any }) {
 function VotePanel({ room, game }: { room: any; game: any }) {
   const g = room.game;
   const me = game.me;
-  const myBet = me.betArtifactId;
+  const myBets: number[] = me.betArtifactIds || [];
+  const remainingVotes = game.remainingVotes || 0;
 
-  // 实时统计每件兽首的押币数
+  // 实时统计
   const betCounts: Record<number, number> = {};
   for (const p of room.players) {
-    if (p.betArtifactId !== undefined) {
-      betCounts[p.betArtifactId] = (betCounts[p.betArtifactId] || 0) + 1;
+    const bets: number[] = p.betArtifactIds || [];
+    for (const id of bets) {
+      betCounts[id] = (betCounts[id] || 0) + 1;
     }
   }
-  const betPlayerCount = room.players.filter((p: any) => p.betArtifactId !== undefined).length;
-  const maxBet = Math.max(1, ...Object.values(betCounts) as number[]);
+  const totalBets = Object.values(betCounts).reduce((a, b) => a + b, 0);
+  const maxBet = Math.max(1, ...Object.values(betCounts));
 
   return (
     <div className="card-antique p-4 space-y-3">
-      <div className="text-bronze font-antique font-bold flex items-center gap-2">
-        <Coins className="w-4 h-4" /> 押币环节 · 第{g.currentRound}轮
+      <div className="flex items-center justify-between">
+        <div className="text-bronze font-antique font-bold flex items-center gap-2">
+          <Coins className="w-4 h-4" /> 押币环节 · 第{g.currentRound}轮
+        </div>
+        <div className="text-sm text-gold-glow font-bold">
+          剩余 <span className="text-lg">{remainingVotes}</span> 票
+        </div>
       </div>
       <div className="text-ivory-dim text-sm leading-relaxed">
-        {myBet !== undefined
-          ? <>已押币，等待其他玩家… <span className="text-jade">（可重新选择）</span></>
-          : '选择一件你认为值得关注的兽首进行押币。押币最多者将被隐藏，第二多者予以揭露。'}
+        {remainingVotes <= 0
+          ? '你的投票次数已用完，等待其他玩家…'
+          : `每轮 2 票，可投不同兽首。押币最多者将被隐藏，第二多者予以揭露。`}
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {g.artifacts.map((a: any) => {
           const count = betCounts[a.id] || 0;
-          const isMyBet = myBet === a.id;
+          const isMyBet = myBets.includes(a.id);
           const isTopBet = count === maxBet && count > 0;
           return (
             <button
@@ -771,49 +808,34 @@ function VotePanel({ room, game }: { room: any; game: any }) {
               className={`zodiac-card aspect-[3/4] flex flex-col items-center justify-center p-2 relative ${
                 isMyBet ? 'selected' : ''
               } ${a.locked ? 'locked' : ''}`}
-              disabled={a.locked}
+              disabled={a.locked || isMyBet || remainingVotes <= 0}
             >
               <div className="font-brush text-2xl text-bronze mb-0.5">{a.name[0]}</div>
               <div className="text-[10px] text-ivory-dim">{a.name[1]}</div>
-              {a.locked && <Lock className="w-3 h-3 text-vermilion mt-1" />}
-              {/* 实时押币数 */}
               <div className={`mt-1 flex items-center gap-0.5 text-[11px] font-bold ${
                 isTopBet ? 'text-gold-glow' : 'text-ivory-dim'
               }`}>
-                <Coins className="w-3 h-3" />
-                <span>{count}</span>
+                <Coins className="w-3 h-3" />{count}
               </div>
-              {/* 押币进度条 */}
               {count > 0 && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30 rounded-b overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 ${
-                      isTopBet ? 'bg-gold-glow' : 'bg-bronze'
-                    }`}
-                    style={{ width: `${(count / maxBet) * 100}%` }}
-                  />
+                  <div className={`h-full ${isTopBet ? 'bg-gold-glow' : 'bg-bronze'}`}
+                    style={{ width: `${(count / maxBet) * 100}%` }} />
                 </div>
               )}
-              {/* 我的押币标记 */}
               {isMyBet && (
-                <div className="absolute top-1 right-1 text-[9px] text-gold-glow font-bold bg-black/50 rounded px-1">
-                  我
-                </div>
+                <div className="absolute top-1 right-1 text-[9px] text-gold-glow font-bold bg-black/50 rounded px-1">我</div>
               )}
             </button>
           );
         })}
       </div>
 
-      {/* 押币进度 */}
       <div className="flex items-center gap-2 text-xs text-ivory-dim">
         <div className="flex-1 bg-black/30 rounded-full h-2 overflow-hidden">
-          <div
-            className="h-full bg-bronze transition-all duration-500"
-            style={{ width: `${(betPlayerCount / room.players.length) * 100}%` }}
-          />
+          <div className="h-full bg-bronze" style={{ width: `${Math.min(100, (totalBets / (room.players.length * 2)) * 100)}%` }} />
         </div>
-        <span>{betPlayerCount} / {room.players.length} 已押</span>
+        <span>总 {totalBets} 票</span>
       </div>
     </div>
   );
@@ -1009,6 +1031,87 @@ function RoleRevealModal({ roleInfo, onClose }: { roleInfo: any; onClose: () => 
 }
 
 // ============================================================
+// 鉴人面板
+// ============================================================
+function IdentifyPanel({ room, game }: { room: any; game: any }) {
+  const g = room.game;
+  const me = game.me;
+  const myRole = game.myRole;
+  // @ts-ignore
+  const roleInfo = myRole ? ROLE_INFO[myRole as any] : null;
+  const myFaction = roleInfo?.faction;
+  const myVote = me.identifyTargetId;
+
+  // 许愿阵营投票指认老朝奉
+  // 老朝奉指认许愿
+  // 药不然指认方震
+  const targets = room.players.filter((p: any) => p.id !== me.id);
+  const isHost = !!me.isHost;
+  const allVoted = Object.keys(g.identifyVotes || {}).length;
+
+  return (
+    <div className="card-antique-glow p-4 sm:p-6 space-y-4">
+      <div className="text-center">
+        <div className="text-gold-glow font-brush text-2xl sm:text-3xl mb-1">鉴人环节</div>
+        <div className="text-ivory-dim text-xs sm:text-sm">三轮鉴宝结束，指认身份的时刻到了</div>
+      </div>
+
+      <div className="bg-black/20 p-3 rounded-md">
+        {myFaction === 'xuyuan' ? (
+          <div className="text-ivory text-sm leading-relaxed">
+            请指认你认为是<span className="text-vermilion font-bold">老朝奉</span>的玩家。许愿阵营多数指认成功即可 +1 分。
+          </div>
+        ) : myRole === 'laochaofeng' ? (
+          <div className="text-ivory text-sm leading-relaxed">
+            请指认你认为是<span className="text-jade font-bold">许愿</span>的玩家。若指认失败，许愿阵营 +2 分。
+          </div>
+        ) : myRole === 'yaoburan' ? (
+          <div className="text-ivory text-sm leading-relaxed">
+            请指认你认为是<span className="text-jade font-bold">方震</span>的玩家。若指认失败，许愿阵营 +1 分。
+          </div>
+        ) : (
+          <div className="text-ivory text-sm leading-relaxed">
+            请指认你认为是<span className="text-vermilion font-bold">老朝奉</span>的玩家。
+          </div>
+        )}
+      </div>
+
+      {myVote ? (
+        <div className="text-center text-jade text-sm">
+          已指认，等待其他玩家…
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {targets.map((p: any) => (
+            <button
+              key={p.id}
+              onClick={() => send({ type: 'identifyVote', targetId: p.id })}
+              className="btn-bronze px-3 py-3 rounded-md text-sm flex flex-col items-center gap-1"
+            >
+              <span className="player-token w-8 h-8 text-xs">{p.name[0]}</span>
+              <span>{p.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 text-xs text-ivory-dim">
+        <div className="flex-1 bg-black/30 rounded-full h-2 overflow-hidden">
+          <div className="h-full bg-bronze" style={{ width: `${(allVoted / room.players.length) * 100}%` }} />
+        </div>
+        <span>{allVoted} / {room.players.length} 已投票</span>
+      </div>
+
+      {isHost && allVoted >= room.players.length && (
+        <Button onClick={() => send({ type: 'nextRound' })} className="btn-seal w-full h-12 text-lg">
+          揭晓结果
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // 终局画面
 // ============================================================
 function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
@@ -1073,9 +1176,13 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
       {g.endLog.length > 0 && (
         <>
           <div className="text-bronze font-antique font-bold mb-2 text-sm">终局纪事</div>
-          <div className="text-left max-w-md mx-auto space-y-1.5 mb-6 bg-black/20 p-3 rounded-md">
+          <div className="text-left max-w-md mx-auto space-y-1.5 mb-6 bg-black/20 p-3 rounded-md max-h-60 overflow-y-auto">
             {g.endLog.map((line: string, i: number) => (
-              <div key={i} className="text-xs text-ivory-dim leading-relaxed">{line}</div>
+              <div key={i} className={`text-xs leading-relaxed border-l-2 pl-2 ${
+                line.includes('+') ? 'text-jade border-jade/30' :
+                line.includes('老朝奉') || line.includes('败') ? 'text-vermilion border-vermilion/30' :
+                'text-ivory-dim border-bronze/30'
+              }`}>{line}</div>
             ))}
           </div>
           <div className="divider-antique"></div>

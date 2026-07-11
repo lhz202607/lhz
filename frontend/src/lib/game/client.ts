@@ -1,5 +1,5 @@
 // ============================================================================
-// 游戏联机客户端 — HTTP 轮询架构（无 WebSocket）
+// 游戏联机客户端 — HTTP 轮询架构
 // ============================================================================
 
 import { useSyncExternalStore } from 'react';
@@ -13,19 +13,16 @@ interface GameState {
   myAppraisals: any;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
+  knownAllies: RoleId[];
+  remainingVotes: number;
   error: string | null;
   connected: boolean;
 }
 
 let state: GameState = {
-  room: null,
-  me: null,
-  myRole: null,
-  myAppraisals: {},
-  fangzhenResults: [],
-  sealedRounds: [],
-  error: null,
-  connected: false,
+  room: null, me: null, myRole: null, myAppraisals: {},
+  fangzhenResults: [], sealedRounds: [], knownAllies: [], remainingVotes: 0,
+  error: null, connected: false,
 };
 
 let playerId: string | null = null;
@@ -45,19 +42,21 @@ interface HeartbeatResponse {
   myAppraisals: Record<number, AppraisalResult[]>;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
+  knownAllies?: RoleId[];
+  remainingVotes?: number;
 }
 
 function applyHeartbeat(data: HeartbeatResponse): void {
   const me = data.room.players.find(p => p.id === playerId) || null;
   setState({
-    room: data.room,
-    me,
+    room: data.room, me,
     myRole: data.myRole,
     myAppraisals: data.myAppraisals,
     fangzhenResults: data.fangzhenResults,
     sealedRounds: data.sealedRounds,
-    connected: true,
-    error: null,
+    knownAllies: data.knownAllies || [],
+    remainingVotes: data.remainingVotes || 0,
+    connected: true, error: null,
   });
 }
 
@@ -66,9 +65,7 @@ async function poll(): Promise<void> {
   try {
     const res = await apiClient.post(`/game/rooms/${roomCode}/heartbeat`, { playerId });
     applyHeartbeat(res.data);
-  } catch (e) {
-    // 静默失败，保持上次状态
-  }
+  } catch (e) { /* 静默失败 */ }
 }
 
 function startPolling(): void {
@@ -80,12 +77,12 @@ function stopPolling(): void {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
-/** 连接房间（HTTP）：加入或重连 */
 export async function connectGame(code: string, name: string, pid?: string): Promise<void> {
   roomCode = code.toUpperCase();
   setState({
     room: null, me: null, myRole: null, myAppraisals: {},
-    fangzhenResults: [], sealedRounds: [], error: null, connected: false,
+    fangzhenResults: [], sealedRounds: [], knownAllies: [], remainingVotes: 0,
+    error: null, connected: false,
   });
   emit();
 
@@ -93,8 +90,7 @@ export async function connectGame(code: string, name: string, pid?: string): Pro
     const res = await apiClient.post(`/game/rooms/${roomCode}/join`, { name, pid });
     playerId = res.data.playerId;
     applyHeartbeat({
-      room: res.data.room,
-      myRole: res.data.myRole || null,
+      room: res.data.room, myRole: res.data.myRole || null,
       myAppraisals: res.data.myAppraisals || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
@@ -106,28 +102,25 @@ export async function connectGame(code: string, name: string, pid?: string): Pro
   }
 }
 
-/** 发送行动 */
 export async function send(msg: ClientMessage): Promise<void> {
   if (!roomCode || !playerId) return;
   try {
     const res = await apiClient.post(`/game/rooms/${roomCode}/action`, { playerId, action: msg });
     applyHeartbeat({
-      room: res.data.room,
-      myRole: res.data.myRole || null,
+      room: res.data.room, myRole: res.data.myRole || null,
       myAppraisals: res.data.myAppraisals || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
+      knownAllies: res.data.knownAllies || [],
+      remainingVotes: res.data.remainingVotes || 0,
     });
   } catch (e: any) {
     const errMsg = e.response?.data?.error || '操作失败';
     setState({ error: errMsg });
-    setTimeout(() => {
-      setState({ error: state.error === errMsg ? null : state.error });
-    }, 3000);
+    setTimeout(() => { setState({ error: state.error === errMsg ? null : state.error }); }, 3000);
   }
 }
 
-/** 添加 AI（专用接口） */
 export async function addAI(): Promise<void> {
   if (!roomCode || !playerId) return;
   try {
@@ -141,17 +134,16 @@ export async function addAI(): Promise<void> {
   }
 }
 
-/** 断开连接 */
 export function disconnectGame(): void {
   if (roomCode && playerId) {
     apiClient.post(`/game/rooms/${roomCode}/leave`, { playerId }).catch(() => {});
   }
   stopPolling();
-  playerId = null;
-  roomCode = null;
+  playerId = null; roomCode = null;
   state = {
-    room: null, me: null, myRole: null, myAppraisals: {},
-    fangzhenResults: [], sealedRounds: [], error: null, connected: false,
+    room: null, me: null, myRole: null, myAppraisals: [],
+    fangzhenResults: [], sealedRounds: [], knownAllies: [], remainingVotes: 0,
+    error: null, connected: false,
   };
   emit();
 }
@@ -161,9 +153,7 @@ function subscribe(cb: () => void): () => void {
   return () => listeners.delete(cb);
 }
 
-function getSnapshot(): GameState {
-  return state;
-}
+function getSnapshot(): GameState { return state; }
 
 export function useGameState(): GameState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

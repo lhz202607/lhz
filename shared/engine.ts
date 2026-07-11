@@ -1,15 +1,13 @@
 // ============================================================================
 // 古董局中局·十二兽首 — 游戏规则引擎
-// 纯函数实现，供后端调用；前后端共享类型
 // ============================================================================
 
 import {
   Artifact, GameRound, GamePhase, GameState, Player, RoleId, Room,
   ROLES, ROLE_CONFIGS, REAL_COUNT, ZODIAC_NAMES, TARGET_SCORE, Faction,
-  PlayerRoundState, AppraisalResult,
+  PlayerRoundState, AppraisalResult, ARTIFACTS_PER_ROUND,
 } from './types';
 
-/** 生成 6 位房间码 */
 export function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -17,12 +15,10 @@ export function generateRoomCode(): string {
   return code;
 }
 
-/** 生成玩家 id */
 export function generatePlayerId(): string {
   return 'p_' + Math.random().toString(36).slice(2, 10);
 }
 
-/** 洗牌 */
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -32,307 +28,219 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/** 生成一局十二兽首：6 真 6 假，打乱顺序 */
-export function generateArtifacts(): Artifact[] {
+/** 生成全部 12 个兽首 */
+export function generateAllArtifacts(): Artifact[] {
   const realFlags = shuffle([true, true, true, true, true, true, false, false, false, false, false, false]);
-  return ZODIAC_NAMES.map((name, i) => ({
-    id: i,
-    name,
-    isReal: realFlags[i],
-  }));
+  return ZODIAC_NAMES.map((name, i) => ({ id: i, name, isReal: realFlags[i] }));
 }
 
-/** 创建初始游戏状态 */
+/** 从已用集合中选取 4 个新兽首（不重复），保证至少 2 真 */
+export function pickArtifactsForRound(allArtifacts: Artifact[], usedIds: Set<number>): Artifact[] {
+  const available = allArtifacts.filter(a => !usedIds.has(a.id));
+  const reals = available.filter(a => a.isReal);
+  const fakes = available.filter(a => !a.isReal);
+  // 确保至少选 2 真 2 假
+  const pickedReals = shuffle(reals).slice(0, Math.max(2, Math.min(2, reals.length)));
+  const pickedFakes = shuffle(fakes).slice(0, ARTIFACTS_PER_ROUND - pickedReals.length);
+  const picked = shuffle([...pickedReals, ...pickedFakes]);
+  // 如果不够 4 个，从余下的补
+  while (picked.length < ARTIFACTS_PER_ROUND && available.length > picked.length) {
+    const rest = available.find(a => !picked.includes(a));
+    if (rest) picked.push(rest);
+    else break;
+  }
+  return picked;
+}
+
 export function createInitialState(): GameState {
   return {
-    phase: 'waiting',
-    currentRound: 1,
-    rounds: [],
-    xuyuanScore: 0,
-    targetScore: TARGET_SCORE,
-    endLog: [],
-    playerRoundStates: {},
+    phase: 'waiting', currentRound: 1, rounds: [],
+    xuyuanScore: 0, targetScore: TARGET_SCORE,
+    endLog: [], playerRoundStates: {},
+    identifyVotes: {},
   };
 }
 
-/** 创建初始房间 */
 export function createRoom(hostName: string, maxPlayers: number = 8): Room {
   const hostId = generatePlayerId();
   return {
-    code: generateRoomCode(),
-    maxPlayers,
-    players: [{
-      id: hostId,
-      name: hostName,
-      isHost: true,
-      isAI: false,
-      connected: true,
-    }],
+    code: generateRoomCode(), maxPlayers,
+    players: [{ id: hostId, name: hostName, isHost: true, isAI: false, connected: true, betArtifactIds: [], remainingVotes: 2 }],
     game: createInitialState(),
     createdAt: Date.now(),
   };
 }
 
-/** 创建 AI 玩家 */
 export function createAIPlayer(name?: string): Player {
   const aiNames = ['AI·许衡', 'AI·黄克明', 'AI·药来', 'AI·姬天明', 'AI·木户三郎', 'AI·郑老'];
-  const nm = name || aiNames[Math.floor(Math.random() * aiNames.length)];
   return {
-    id: generatePlayerId(),
-    name: nm,
-    isHost: false,
-    isAI: true,
-    connected: true,
+    id: generatePlayerId(), name: name || aiNames[Math.floor(Math.random() * aiNames.length)],
+    isHost: false, isAI: true, connected: true,
+    betArtifactIds: [], remainingVotes: 2,
   };
 }
 
-/** 分配角色 */
+/** 分配角色（随机、不重复） */
 export function assignRoles(room: Room): void {
   const config = ROLE_CONFIGS[room.players.length];
   if (!config) throw new Error(`不支持 ${room.players.length} 人局`);
-  // 确保角色不重复：去重后再洗牌
-  const uniqueRoles = [...new Set(config)];
-  const deck = shuffle(uniqueRoles);
+  const deck = shuffle([...new Set(config)]);
   room.players.forEach((p, i) => {
     p.role = deck[i];
-    // 重置玩家游戏内状态
     p.permanentlyDisabled = false;
-    p.fangzhenCheckTarget = undefined;
-    p.fangzhenCheckResult = undefined;
-    p.yaoburanSealTarget = undefined;
-    p.zhengguoquLockedArtifact = undefined;
+    p.fangzhenCheckTarget = undefined; p.fangzhenCheckResult = undefined;
+    p.yaoburanSealTarget = undefined; p.zhengguoquLockedArtifact = undefined;
     p.laochaofengUsedFlip = false;
-    p.speech = undefined;
-    p.hasSpoken = false;
-    p.betArtifactId = undefined;
+    p.speech = undefined; p.hasSpoken = false;
+    p.betArtifactIds = []; p.remainingVotes = 2;
+    p.identifyTargetId = undefined;
   });
   room.game.playerRoundStates = {};
   room.game.xuyuanScore = 0;
   room.game.endLog = [];
   room.game.winner = undefined;
+  room.game.identifyVotes = {};
 }
 
-/** 开始新一轮：生成兽首、确定发言顺序、设置随机无法鉴宝 */
-export function startRound(room: Room, roundNumber: number): void {
+/** 获取老朝奉阵营玩家可见的队友列表 */
+export function getKnownAllies(room: Room, playerId: string): RoleId[] {
+  const player = room.players.find(p => p.id === playerId);
+  if (!player || !player.role) return [];
+  if (player.role === 'laochaofeng' || player.role === 'yaoburan') {
+    // 老朝奉和药不然互相可见
+    return room.players
+      .filter(p => p.id !== playerId && (p.role === 'laochaofeng' || p.role === 'yaoburan'))
+      .map(p => p.role!);
+  }
+  // 郑国渠看不到队友，其他好人也不知道队友
+  return [];
+}
+
+/** 开始新一轮 */
+export function startRound(room: Room, roundNumber: number, allArtifacts: Artifact[], usedArtifactIds: Set<number>): void {
   const game = room.game;
-  const artifacts = generateArtifacts();
+  // 选取本轮 4 个兽首
+  const artifacts = pickArtifactsForRound(allArtifacts, usedArtifactIds);
+  artifacts.forEach(a => usedArtifactIds.add(a.id));
 
-  // 发言顺序随机
   const speechOrder = shuffle(room.players.map(p => p.id));
-
-  // 鉴宝顺序：随机打乱
   const appraiseOrder = shuffle(room.players.map(p => p.id));
-  // 第一个鉴宝玩家
   const firstAppraiser = appraiseOrder[0];
 
   const round: GameRound = {
-    roundNumber,
-    phase: 'appraise',
-    speechOrder,
-    currentSpeakerIndex: 0,
-    artifacts,
-    laochaofengUsedFlip: false,
-    betCounts: {},
-    events: [],
-    currentAppraiserId: firstAppraiser,
-    appraiseOrder,
-    finishedAppraisers: [],
+    roundNumber, phase: 'appraise', speechOrder, currentSpeakerIndex: 0,
+    artifacts, laochaofengUsedFlip: false, betCounts: {}, events: [],
+    currentAppraiserId: firstAppraiser, appraiseOrder, finishedAppraisers: [],
   };
 
-  // 移除上一轮数据（保留历史 rounds 数组用于记录）
   game.rounds[roundNumber - 1] = round;
   game.currentRound = roundNumber;
   game.phase = 'appraise';
 
-  // 重置玩家本轮状态
   room.players.forEach(p => {
-    p.fangzhenCheckTarget = undefined;
-    p.fangzhenCheckResult = undefined;
-    p.yaoburanSealTarget = undefined;
-    p.zhengguoquLockedArtifact = undefined;
+    p.fangzhenCheckTarget = undefined; p.fangzhenCheckResult = undefined;
+    p.yaoburanSealTarget = undefined; p.zhengguoquLockedArtifact = undefined;
     p.laochaofengUsedFlip = false;
-    p.speech = undefined;
-    p.hasSpoken = false;
-    p.betArtifactId = undefined;
+    p.speech = undefined; p.hasSpoken = false;
+    p.betArtifactIds = [];
+    // 每轮补充 2 票
+    p.remainingVotes = (p.remainingVotes || 0) + 2;
   });
 
-  // 初始化每玩家本轮状态，并设置黄烟烟/木户加奈的随机无法鉴宝
   const skipPlayers = room.players.filter(p => p.role === 'huangyanyan' || p.role === 'muhujianai');
-  // 三轮中随机一轮无法鉴宝；这里为简单：每轮 30% 概率，但保证三轮中至少一轮
   const skipRounds = new Set<number>();
-  // 随机选定一轮（1/2/3）
   skipRounds.add(1 + Math.floor(Math.random() * 3));
 
   room.players.forEach(p => {
     if (!game.playerRoundStates[p.id]) game.playerRoundStates[p.id] = {};
     const randomlyBlocked = skipPlayers.includes(p) && skipRounds.has(roundNumber);
-    game.playerRoundStates[p.id][roundNumber] = {
-      sealed: false,
-      randomlyBlocked,
-      appraisals: [],
-    };
+    game.playerRoundStates[p.id][roundNumber] = { sealed: false, randomlyBlocked, appraisals: [] };
   });
 }
 
-/** 判断玩家本轮是否能鉴宝 */
 export function canAppraise(room: Room, playerId: string): { can: boolean; reason?: string; count: number } {
   const player = room.players.find(p => p.id === playerId);
   if (!player || !player.role) return { can: false, reason: '未分配角色', count: 0 };
-
   const role = ROLES[player.role];
   if (role.appraiseCount === 0) return { can: false, reason: '该角色无法鉴宝', count: 0 };
-
-  // 姬云浮永久失能
   if (player.permanentlyDisabled) return { can: false, reason: '已被永久封印', count: 0 };
-
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return { can: false, reason: '当前无进行中的轮次', count: 0 };
-
   const rs = room.game.playerRoundStates[playerId]?.[room.game.currentRound];
   if (!rs) return { can: false, reason: '状态未初始化', count: 0 };
-
-  if (rs.sealed) return { can: false, reason: '本轮已被药不然封印', count: 0 };
-  if (rs.randomlyBlocked) return { can: false, reason: '本轮心神不宁，无法鉴宝', count: 0 };
-
-  // 已鉴定数量
+  if (rs.sealed) return { can: false, reason: '本轮已被封印', count: 0 };
+  if (rs.randomlyBlocked) return { can: false, reason: '本轮心神不宁', count: 0 };
   const done = rs.appraisals.length;
   const remaining = role.appraiseCount - done;
-  if (remaining <= 0) return { can: false, reason: '本轮鉴宝次数已用完', count: 0 };
-
+  if (remaining <= 0) return { can: false, reason: '次数已用完', count: 0 };
   return { can: true, count: remaining };
 }
 
-/** 玩家执行鉴宝：返回该玩家看到的真假 */
 export function appraise(room: Room, playerId: string, artifactId: number): AppraisalResult | { error: string } {
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { error: '玩家不存在' };
-
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return { error: '当前无进行中的轮次' };
-
-  // 只有当前鉴宝玩家可以鉴定
-  if (round.currentAppraiserId && round.currentAppraiserId !== playerId) {
-    return { error: '当前不是你的鉴宝回合' };
-  }
-
+  if (round.currentAppraiserId && round.currentAppraiserId !== playerId) return { error: '当前不是你的鉴宝回合' };
   const check = canAppraise(room, playerId);
   if (!check.can) return { error: check.reason || '无法鉴宝' };
-
   const artifact = round.artifacts.find(a => a.id === artifactId);
   if (!artifact) return { error: '兽首不存在' };
-
-  // 郑国渠封存的兽首无法鉴定
-  if (round.lockedArtifactId === artifactId) return { error: '该兽首已被封存，无法鉴定' };
-
+  if (round.lockedArtifactId === artifactId) return { error: '该兽首已被封存' };
   const rs = room.game.playerRoundStates[playerId][room.game.currentRound];
-
-  // 判断玩家看到的真假
   let appearsReal = artifact.isReal;
   const role = ROLES[player.role!];
-
-  // 姬云浮不受颠倒影响
-  if (role.id !== 'jiyunfu' && round.laochaofengUsedFlip) {
-    appearsReal = !appearsReal;
-  }
-
-  // 老朝奉自己看到的是真实（颠倒只对好人）
-  if (role.faction === 'laochaofeng') {
-    appearsReal = artifact.isReal;
-  }
-
+  if (role.id !== 'jiyunfu' && round.laochaofengUsedFlip) appearsReal = !appearsReal;
+  if (role.faction === 'laochaofeng') appearsReal = artifact.isReal;
   const result: AppraisalResult = { artifactId, appearsReal };
   rs.appraisals.push(result);
   return result;
 }
 
-/** 鉴宝玩家指定下一个鉴宝玩家 */
 export function passAppraiseTurn(room: Room, playerId: string, nextPlayerId: string): { ok: boolean; error?: string } {
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return { ok: false, error: '当前无进行中的轮次' };
   if (room.game.phase !== 'appraise') return { ok: false, error: '当前非鉴宝阶段' };
-
-  // 只有当前鉴宝玩家可以指定下一个
-  if (round.currentAppraiserId !== playerId) {
-    return { ok: false, error: '当前不是你的鉴宝回合' };
-  }
-
-  // 不能指定自己
-  if (playerId === nextPlayerId) {
-    return { ok: false, error: '不能指定自己' };
-  }
-
-  // 不能指定已完成的玩家
-  if (round.finishedAppraisers.includes(nextPlayerId)) {
-    return { ok: false, error: '该玩家已完成鉴宝' };
-  }
-
+  if (round.currentAppraiserId !== playerId) return { ok: false, error: '当前不是你的鉴宝回合' };
+  if (playerId === nextPlayerId) return { ok: false, error: '不能指定自己' };
+  if (round.finishedAppraisers.includes(nextPlayerId)) return { ok: false, error: '该玩家已完成鉴宝' };
   const nextPlayer = room.players.find(p => p.id === nextPlayerId);
   if (!nextPlayer) return { ok: false, error: '目标玩家不存在' };
-
-  // 标记当前玩家完成
-  if (!round.finishedAppraisers.includes(playerId)) {
-    round.finishedAppraisers.push(playerId);
-  }
-
-  // 检查目标玩家是否可以鉴宝
+  if (!round.finishedAppraisers.includes(playerId)) round.finishedAppraisers.push(playerId);
   const nextCheck = canAppraise(room, nextPlayerId);
   if (!nextCheck.can) {
-    // 目标玩家无法鉴宝，也标记为完成，继续找下一个
-    if (!round.finishedAppraisers.includes(nextPlayerId)) {
-      round.finishedAppraisers.push(nextPlayerId);
-    }
-    // 自动跳到下一个未完成的玩家
-    const remaining = round.appraiseOrder.find(id =>
-      !round.finishedAppraisers.includes(id) && canAppraise(room, id).can
-    );
-    if (remaining) {
-      round.currentAppraiserId = remaining;
-    } else {
-      // 检查是否还有任何能鉴宝的玩家
-      const anyLeft = round.appraiseOrder.find(id =>
-        !round.finishedAppraisers.includes(id) && canAppraise(room, id).can
-      );
-      if (!anyLeft) {
-        // 所有人都完成了（或无法鉴宝），标记无法鉴宝的玩家也完成
-        round.appraiseOrder.forEach(id => {
-          if (!round.finishedAppraisers.includes(id)) {
-            round.finishedAppraisers.push(id);
-          }
-        });
-        round.currentAppraiserId = undefined;
-        // 自动进入发言阶段
-        enterDiscussPhase(room);
-        round.events.push('全员鉴宝完毕，进入发言环节。');
-      }
+    if (!round.finishedAppraisers.includes(nextPlayerId)) round.finishedAppraisers.push(nextPlayerId);
+    const remaining = round.appraiseOrder.find(id => !round.finishedAppraisers.includes(id) && canAppraise(room, id).can);
+    if (remaining) { round.currentAppraiserId = remaining; return { ok: true }; }
+    const anyLeft = round.appraiseOrder.find(id => !round.finishedAppraisers.includes(id) && canAppraise(room, id).can);
+    if (!anyLeft) {
+      round.appraiseOrder.forEach(id => { if (!round.finishedAppraisers.includes(id)) round.finishedAppraisers.push(id); });
+      round.currentAppraiserId = undefined;
+      enterDiscussPhase(room);
+      round.events.push('全员鉴宝完毕，进入发言环节。');
     }
     return { ok: true };
   }
-
   round.currentAppraiserId = nextPlayerId;
   return { ok: true };
 }
 
-/** 检查鉴宝阶段是否所有人已完成 */
 export function isAppraiseDone(room: Room): boolean {
   const round = room.game.rounds[room.game.currentRound - 1];
-  if (!round) return false;
-  return round.finishedAppraisers.length >= room.players.length;
+  return round ? round.finishedAppraisers.length >= room.players.length : false;
 }
 
-/** 老朝奉使用颠倒乾坤 */
 export function laochaofengUseFlip(room: Room, playerId: string, use: boolean): { ok: boolean; error?: string } {
   const player = room.players.find(p => p.id === playerId);
   if (!player || player.role !== 'laochaofeng') return { ok: false, error: '只有老朝奉可使用此技能' };
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return { ok: false, error: '当前无进行中的轮次' };
-  // 颠倒在鉴宝阶段使用，影响后续好人
   if (room.game.phase !== 'appraise') return { ok: false, error: '仅鉴宝阶段可使用' };
   round.laochaofengUsedFlip = use;
   player.laochaofengUsedFlip = use;
   return { ok: true };
 }
 
-/** 药不然封印玩家 */
 export function yaoburanSeal(room: Room, playerId: string, targetId: string): { ok: boolean; error?: string } {
   const player = room.players.find(p => p.id === playerId);
   if (!player || player.role !== 'yaoburan') return { ok: false, error: '只有药不然可使用此技能' };
@@ -340,28 +248,18 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
   const target = room.players.find(p => p.id === targetId);
   if (!target) return { ok: false, error: '目标不存在' };
   if (room.game.phase !== 'appraise') return { ok: false, error: '仅鉴宝阶段可使用' };
-
   const rs = room.game.playerRoundStates[targetId]?.[room.game.currentRound];
   if (!rs) return { ok: false, error: '目标状态未初始化' };
   rs.sealed = true;
   player.yaoburanSealTarget = targetId;
-
-  // 姬云浮被药不然封印则永久失能
-  if (target.role === 'jiyunfu') {
-    target.permanentlyDisabled = true;
-  }
-  // 方震被封印则许愿本轮也无法鉴宝
+  if (target.role === 'jiyunfu') target.permanentlyDisabled = true;
   if (target.role === 'fangzhen') {
     const xuyuan = room.players.find(p => p.role === 'xuyuan');
-    if (xuyuan) {
-      const xrs = room.game.playerRoundStates[xuyuan.id]?.[room.game.currentRound];
-      if (xrs) xrs.sealed = true;
-    }
+    if (xuyuan) { const xrs = room.game.playerRoundStates[xuyuan.id]?.[room.game.currentRound]; if (xrs) xrs.sealed = true; }
   }
   return { ok: true };
 }
 
-/** 郑国渠封存兽首 */
 export function zhengguoquLock(room: Room, playerId: string, artifactId: number): { ok: boolean; error?: string } {
   const player = room.players.find(p => p.id === playerId);
   if (!player || player.role !== 'zhengguoqu') return { ok: false, error: '只有郑国渠可使用此技能' };
@@ -375,7 +273,6 @@ export function zhengguoquLock(room: Room, playerId: string, artifactId: number)
   return { ok: true };
 }
 
-/** 方震查验阵营 */
 export function fangzhenCheck(room: Room, playerId: string, targetId: string): { ok: boolean; faction?: Faction; error?: string } {
   const player = room.players.find(p => p.id === playerId);
   if (!player || player.role !== 'fangzhen') return { ok: false, error: '只有方震可使用此技能' };
@@ -383,35 +280,12 @@ export function fangzhenCheck(room: Room, playerId: string, targetId: string): {
   const target = room.players.find(p => p.id === targetId);
   if (!target || !target.role) return { ok: false, error: '目标无效' };
   if (room.game.phase !== 'appraise') return { ok: false, error: '仅鉴宝阶段可使用' };
-
   const faction = ROLES[target.role].faction;
   player.fangzhenCheckTarget = targetId;
   player.fangzhenCheckResult = faction;
   return { ok: true, faction };
 }
 
-/** 检查所有玩家是否完成鉴宝阶段（技能使用完毕 + 鉴宝次数用尽或主动结束） */
-export function isAppraisePhaseDone(room: Room): boolean {
-  const round = room.game.rounds[room.game.currentRound - 1];
-  if (!round) return false;
-  for (const p of room.players) {
-    if (p.isAI) continue;
-    const rs = room.game.playerRoundStates[p.id]?.[room.game.currentRound];
-    if (!rs) return false;
-    const role = ROLES[p.role!];
-    // 方震无鉴宝，但需确认已查验或放弃
-    // 简化：只要鉴宝次数用完或无法鉴宝即可
-    if (role.appraiseCount > 0 && !rs.sealed && !rs.randomlyBlocked && !p.permanentlyDisabled) {
-      if (rs.appraisals.length < role.appraiseCount) {
-        // 还能鉴宝但未鉴完 —— 允许玩家主动结束，所以不算未完成
-        // 由前端「结束鉴宝」按钮处理
-      }
-    }
-  }
-  return true; // 由「结束鉴宝」按钮主动推进
-}
-
-/** 进入发言阶段 */
 export function enterDiscussPhase(room: Room): void {
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return;
@@ -420,7 +294,6 @@ export function enterDiscussPhase(room: Room): void {
   round.currentSpeakerIndex = 0;
 }
 
-/** 玩家发言 */
 export function playerSpeech(room: Room, playerId: string, content: string): { ok: boolean; error?: string } {
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round || round.phase !== 'discuss') return { ok: false, error: '当前非发言阶段' };
@@ -430,85 +303,67 @@ export function playerSpeech(room: Room, playerId: string, content: string): { o
   if (!player) return { ok: false, error: '玩家不存在' };
   player.speech = content;
   player.hasSpoken = true;
-  // 推进到下一位
   round.currentSpeakerIndex++;
   return { ok: true };
 }
 
-/** 是否所有人发言完毕 */
 export function isDiscussDone(room: Room): boolean {
   const round = room.game.rounds[room.game.currentRound - 1];
-  if (!round) return false;
-  return round.currentSpeakerIndex >= round.speechOrder.length;
+  return round ? round.currentSpeakerIndex >= round.speechOrder.length : false;
 }
 
-/** 进入押币阶段 */
 export function enterVotePhase(room: Room): void {
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return;
   round.phase = 'vote';
   room.game.phase = 'vote';
   round.betCounts = {};
-  room.players.forEach(p => { p.betArtifactId = undefined; });
+  room.players.forEach(p => { p.betArtifactIds = []; });
 }
 
-/** 玩家押币 */
+/** 玩家押币（支持多票） */
 export function playerBet(room: Room, playerId: string, artifactId: number): { ok: boolean; error?: string } {
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round || round.phase !== 'vote') return { ok: false, error: '当前非押币阶段' };
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { ok: false, error: '玩家不存在' };
-  if (player.betArtifactId !== undefined) return { ok: false, error: '本轮已押币' };
+  if (player.remainingVotes <= 0) return { ok: false, error: '本轮投票次数已用完' };
+  if (player.betArtifactIds.includes(artifactId)) return { ok: false, error: '已押过该兽首' };
   const artifact = round.artifacts.find(a => a.id === artifactId);
   if (!artifact) return { ok: false, error: '兽首不存在' };
-  player.betArtifactId = artifactId;
+  player.betArtifactIds.push(artifactId);
+  player.remainingVotes--;
   round.betCounts[artifactId] = (round.betCounts[artifactId] || 0) + 1;
   return { ok: true };
 }
 
-/** 是否所有人押币完毕 */
 export function isVoteDone(room: Room): boolean {
-  const round = room.game.rounds[room.game.currentRound - 1];
-  if (!round) return false;
-  return room.players.every(p => p.betArtifactId !== undefined);
+  return room.players.every(p => p.remainingVotes <= 0 || p.isAI);
 }
 
-/** 结算本轮押币：押币最多者隐藏，第二多者揭露 */
 export function resolveBets(room: Room): void {
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return;
   round.phase = 'reveal';
   room.game.phase = 'reveal';
 
-  // 统计：按押币数排序
-  const entries = Object.entries(round.betCounts).map(([id, count]) => ({
-    artifactId: Number(id),
-    count,
-  }));
+  const entries = Object.entries(round.betCounts).map(([id, count]) => ({ artifactId: Number(id), count }));
   entries.sort((a, b) => b.count - a.count);
 
-  if (entries.length === 0) {
-    round.events.push('本轮无人押币。');
-    return;
-  }
+  if (entries.length === 0) { round.events.push('本轮无人押币。'); return; }
 
   const hiddenId = entries[0].artifactId;
   round.hiddenArtifactId = hiddenId;
   const hiddenArtifact = round.artifacts.find(a => a.id === hiddenId)!;
-  round.events.push(`【${hiddenArtifact.name}】获得最多押币，已被隐藏，真伪成谜。`);
+  round.events.push(`【${hiddenArtifact.name}】获得最多押币，已被隐藏。`);
 
-  let revealedId: number | undefined;
-  let revealedIsReal = false;
   if (entries.length >= 2) {
-    revealedId = entries[1].artifactId;
+    const revealedId = entries[1].artifactId;
     round.revealedArtifactId = revealedId;
     const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
-    revealedIsReal = revealedArtifact.isReal;
+    const revealedIsReal = revealedArtifact.isReal;
     round.revealedIsReal = revealedIsReal;
-    round.events.push(
-      `【${revealedArtifact.name}】获得第二多押币，予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`
-    );
-    // 揭露为真品，许愿阵营 +1
+    round.events.push(`【${revealedArtifact.name}】予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
     if (revealedIsReal) {
       room.game.xuyuanScore += 1;
       round.events.push('揭露真品，许愿阵营 +1 分。');
@@ -516,38 +371,115 @@ export function resolveBets(room: Room): void {
   }
 }
 
-/** 进入下一轮或结束游戏 */
-export function nextRoundOrEnd(room: Room): void {
+export function nextRoundOrEnd(room: Room, allArtifacts: Artifact[], usedArtifactIds: Set<number>): void {
   if (room.game.currentRound >= 3) {
-    endGame(room);
+    enterIdentifyPhase(room);
     return;
   }
-  startRound(room, room.game.currentRound + 1);
+  startRound(room, room.game.currentRound + 1, allArtifacts, usedArtifactIds);
 }
 
-/** 游戏结束结算 */
-export function endGame(room: Room): void {
+// ============================================================================
+// 鉴人环节
+// ============================================================================
+
+export function enterIdentifyPhase(room: Room): void {
+  room.game.phase = 'identify';
+  room.game.identifyVotes = {};
+  room.players.forEach(p => { p.identifyTargetId = undefined; });
+}
+
+/** 鉴人环节投票 */
+export function identifyVote(room: Room, playerId: string, targetId: string): { ok: boolean; error?: string } {
+  if (room.game.phase !== 'identify') return { ok: false, error: '当前非鉴人阶段' };
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return { ok: false, error: '玩家不存在' };
+  const target = room.players.find(p => p.id === targetId);
+  if (!target) return { ok: false, error: '目标不存在' };
+  // 不能投自己
+  if (playerId === targetId) return { ok: false, error: '不能指认自己' };
+  // 老朝奉阵营的人不能投自己阵营的人
+  const myFaction = ROLES[player.role!].faction;
+  const targetFaction = ROLES[target.role!].faction;
+  // 限制投票规则：
+  // - 许愿阵营：投票指认老朝奉
+  // - 老朝奉（老朝奉本人）：指认许愿
+  // - 药不然：指认方震
+  // - 郑国渠：可以跟老朝奉或药不然投（但他不知道队友是谁，所以可以随便投）
+  player.identifyTargetId = targetId;
+  room.game.identifyVotes[playerId] = targetId;
+  return { ok: true };
+}
+
+export function isIdentifyDone(room: Room): boolean {
+  return room.players.every(p => p.identifyTargetId !== undefined);
+}
+
+export function resolveIdentify(room: Room): void {
   const game = room.game;
-  game.phase = 'ended';
-
-  // 识别身份：方震是否被药不然封印过（简化：检查药不然是否在三轮中封印过方震）
-  // 这里采用更直接的判定：由前端在押币阶段猜测，此处简化为基于兽首揭真得分 + 身份识别加分
-  // 为了游戏性，我们让游戏在三轮后进入「身份指认」环节由玩家投票
-  // 此处先做基础判定：根据已有分数
-
   const log: string[] = [];
-  log.push('—— 三轮鉴宝结束 ——');
-  log.push(`许愿阵营当前得分：${game.xuyuanScore} / ${game.targetScore}`);
+  log.push('—— 鉴人环节 ——');
 
-  // 身份识别奖励（简化版）：好人若在押币阶段押中真品更多，视为找到线索
-  // 此处简化胜负判定
+  // 统计许愿阵营（好人）对老朝奉的指认
+  const xuyuanVotes = room.players
+    .filter(p => p.role && ROLES[p.role].faction === 'xuyuan')
+    .map(p => game.identifyVotes[p.id])
+    .filter(Boolean);
+  const laochaofengId = room.players.find(p => p.role === 'laochaofeng')?.id;
+  const xuyuanId = room.players.find(p => p.role === 'xuyuan')?.id;
+  const fangzhenId = room.players.find(p => p.role === 'fangzhen')?.id;
+  const yaoburanId = room.players.find(p => p.role === 'yaoburan')?.id;
+
+  // 1. 许愿阵营指认老朝奉
+  if (laochaofengId) {
+    const correctVotes = xuyuanVotes.filter(v => v === laochaofengId);
+    // 多数决：超过半数好人指认正确则成功
+    const xuyuanPlayers = room.players.filter(p => p.role && ROLES[p.role].faction === 'xuyuan');
+    if (correctVotes.length >= Math.ceil(xuyuanPlayers.length / 2)) {
+      game.xuyuanScore += 1;
+      log.push(`许愿阵营成功指认老朝奉！许愿阵营 +1 分。`);
+    } else {
+      log.push(`许愿阵营未能指认出老朝奉。`);
+    }
+  }
+
+  // 2. 老朝奉指认许愿
+  if (laochaofengId && xuyuanId) {
+    const lcfVote = game.identifyVotes[laochaofengId];
+    if (lcfVote === xuyuanId) {
+      log.push(`老朝奉成功指认许愿！但这对胜负无直接影响。`);
+    } else {
+      game.xuyuanScore += 2;
+      log.push(`老朝奉未指认出许愿！许愿阵营 +2 分。`);
+    }
+  }
+
+  // 3. 药不然指认方震
+  if (yaoburanId && fangzhenId) {
+    const ybrVote = game.identifyVotes[yaoburanId];
+    if (ybrVote === fangzhenId) {
+      log.push(`药不然成功指认方震！但这对胜负无直接影响。`);
+    } else {
+      game.xuyuanScore += 1;
+      log.push(`药不然未指认出方震！许愿阵营 +1 分。`);
+    }
+  }
+
+  log.push(`许愿阵营最终得分：${game.xuyuanScore} / ${game.targetScore}`);
+
   if (game.xuyuanScore >= game.targetScore) {
     game.winner = 'xuyuan';
     log.push('许愿阵营达到目标分数，赢得本局！');
   } else {
     game.winner = 'laochaofeng';
-    log.push(`许愿阵营未达目标分数，老朝奉阵营赢得本局！`);
+    log.push('许愿阵营未达目标分数，老朝奉阵营赢得本局！');
   }
 
   game.endLog = log;
+  game.phase = 'ended';
+}
+
+/** 兼容旧调用 */
+export function endGame(room: Room): void {
+  enterIdentifyPhase(room);
 }

@@ -1,5 +1,5 @@
 // ============================================================================
-// 房间管理器 — 管理所有房间状态（HTTP 轮询架构）
+// 房间管理器 — 管理所有房间状态
 // ============================================================================
 
 import { Room, Player, PublicRoom, PublicPlayer, RoleId } from '../../../shared/types';
@@ -7,6 +7,8 @@ import * as engine from '../../../shared/engine';
 
 class RoomManager {
   private rooms = new Map<string, Room>();
+  private roomAllArtifacts = new Map<string, any[]>();
+  private roomUsedIds = new Map<string, Set<number>>();
 
   createRoom(hostName: string, maxPlayers: number = 8): Room {
     let room = engine.createRoom(hostName, maxPlayers);
@@ -14,6 +16,9 @@ class RoomManager {
       room = engine.createRoom(hostName, maxPlayers);
     }
     this.rooms.set(room.code, room);
+    // 为房间预生成全部 12 个兽首
+    this.roomAllArtifacts.set(room.code, engine.generateAllArtifacts());
+    this.roomUsedIds.set(room.code, new Set());
     return room;
   }
 
@@ -23,9 +28,18 @@ class RoomManager {
 
   removeRoom(code: string): void {
     this.rooms.delete(code);
+    this.roomAllArtifacts.delete(code);
+    this.roomUsedIds.delete(code);
   }
 
-  /** 添加 AI 玩家 */
+  getAllArtifacts(code: string): any[] {
+    return this.roomAllArtifacts.get(code) || engine.generateAllArtifacts();
+  }
+
+  getUsedIds(code: string): Set<number> {
+    return this.roomUsedIds.get(code) || new Set();
+  }
+
   addAI(code: string): { ok: boolean; error?: string } {
     const room = this.getRoom(code);
     if (!room) return { ok: false, error: '房间不存在' };
@@ -36,25 +50,6 @@ class RoomManager {
     return { ok: true };
   }
 
-  markDisconnected(code: string, playerId: string): void {
-    const room = this.getRoom(code);
-    if (!room) return;
-    const player = room.players.find(p => p.id === playerId);
-    if (player && !player.isAI) player.connected = false;
-    // 清理空房间
-    const hasReal = room.players.some(p => !p.isAI && p.connected);
-    if (!hasReal && room.game.phase === 'waiting') {
-      // 延迟清理：给重连留时间
-      setTimeout(() => {
-        const r = this.getRoom(code);
-        if (r && !r.players.some(p => !p.isAI && p.connected) && r.game.phase === 'waiting') {
-          this.removeRoom(code);
-        }
-      }, 10000);
-    }
-  }
-
-  /** 踢出玩家（仅房主可用） */
   removePlayer(code: string, playerId: string): { ok: boolean; error?: string } {
     const room = this.getRoom(code);
     if (!room) return { ok: false, error: '房间不存在' };
@@ -65,23 +60,36 @@ class RoomManager {
     return { ok: true };
   }
 
-  /** 转换为公开房间视图（带个人视角） */
+  markDisconnected(code: string, playerId: string): void {
+    const room = this.getRoom(code);
+    if (!room) return;
+    const player = room.players.find(p => p.id === playerId);
+    if (player && !player.isAI) player.connected = false;
+    const hasReal = room.players.some(p => !p.isAI && p.connected);
+    if (!hasReal && room.game.phase === 'waiting') {
+      setTimeout(() => {
+        const r = this.getRoom(code);
+        if (r && !r.players.some(p => !p.isAI && p.connected) && r.game.phase === 'waiting') {
+          this.removeRoom(code);
+        }
+      }, 10000);
+    }
+  }
+
   toPublicRoom(room: Room, viewerId?: string): PublicRoom {
     const round = room.game.rounds[room.game.currentRound - 1];
     const isReveal = room.game.phase === 'reveal' || room.game.phase === 'ended';
+    const isIdentify = room.game.phase === 'identify';
 
     const players: PublicPlayer[] = room.players.map(p => {
       const rs = room.game.playerRoundStates[p.id]?.[room.game.currentRound];
       return {
-        id: p.id,
-        name: p.name,
-        isHost: p.isHost,
-        isAI: p.isAI,
-        connected: p.connected,
+        id: p.id, name: p.name, isHost: p.isHost, isAI: p.isAI, connected: p.connected,
         hasSpoken: p.hasSpoken,
-        betArtifactId: (room.game.phase === 'vote' || room.game.phase === 'reveal' || room.game.phase === 'ended') ? p.betArtifactId : undefined,
+        betArtifactIds: (room.game.phase === 'vote' || room.game.phase === 'reveal' || room.game.phase === 'ended') ? p.betArtifactIds : undefined,
         visiblySealed: rs?.sealed,
-        role: room.game.phase === 'ended' ? p.role : undefined,
+        role: (room.game.phase === 'ended' || isIdentify) ? p.role : undefined,
+        identifyTargetId: isIdentify ? p.identifyTargetId : undefined,
       };
     });
 
@@ -92,57 +100,40 @@ class RoomManager {
     let speeches: Record<string, string> = {};
     let events: string[] = [];
     let flipUsedThisRound = false;
+    let appraiseOrder: string[] = [];
 
     if (round) {
       flipUsedThisRound = round.laochaofengUsedFlip;
-      artifacts = round.artifacts.map(a => ({
-        id: a.id,
-        name: a.name,
-        locked: round.lockedArtifactId === a.id,
-      }));
+      artifacts = round.artifacts.map(a => ({ id: a.id, name: a.name, locked: round.lockedArtifactId === a.id }));
       speechOrder = round.speechOrder;
       currentSpeakerIndex = round.currentSpeakerIndex;
       events = round.events;
-      room.players.forEach(p => {
-        if (p.speech) speeches[p.id] = p.speech;
-      });
+      appraiseOrder = round.appraiseOrder;
+      room.players.forEach(p => { if (p.speech) speeches[p.id] = p.speech; });
 
       if (isReveal) {
         revealedArtifacts = round.artifacts.map(a => {
           const betCount = round.betCounts[a.id] || 0;
           const hidden = round.hiddenArtifactId === a.id;
           const revealed = round.revealedArtifactId === a.id;
-          return {
-            id: a.id,
-            name: a.name,
-            isReal: (revealed || room.game.phase === 'ended') ? a.isReal : undefined,
-            betCount,
-            hidden,
-          };
+          return { id: a.id, name: a.name, isReal: (revealed || room.game.phase === 'ended') ? a.isReal : undefined, betCount, hidden };
         });
       }
     }
 
     return {
-      code: room.code,
-      players,
-      maxPlayers: room.maxPlayers,
+      code: room.code, players, maxPlayers: room.maxPlayers,
       game: {
-        phase: room.game.phase,
-        currentRound: room.game.currentRound,
-        xuyuanScore: room.game.xuyuanScore,
-        targetScore: room.game.targetScore,
-        winner: room.game.winner,
-        endLog: room.game.endLog,
-        artifacts,
-        revealedArtifacts,
-        speechOrder,
-        currentSpeakerIndex,
-        speeches,
-        events,
+        phase: room.game.phase, currentRound: room.game.currentRound,
+        xuyuanScore: room.game.xuyuanScore, targetScore: room.game.targetScore,
+        winner: room.game.winner, endLog: room.game.endLog,
+        artifacts, revealedArtifacts,
+        speechOrder, currentSpeakerIndex, speeches, events,
         flipUsedThisRound,
         currentAppraiserId: round?.currentAppraiserId,
         finishedAppraisers: round?.finishedAppraisers || [],
+        appraiseOrder,
+        identifyVotes: room.game.identifyVotes || {},
       },
     };
   }
