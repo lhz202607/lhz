@@ -1119,7 +1119,7 @@ function RevealPanel({ room, game }: { room: any; game: any }) {
   const me = game.me;
   const revealed = g.revealedArtifacts || [];
   const hiddenArtifact = revealed.find((a: any) => a.hidden);
-  const exposedArtifact = revealed.find((a: any) => !a.hidden);
+  const exposedArtifact = revealed.find((a: any) => a.isReal !== undefined);
   const scoreReached = g.xuyuanScore >= g.targetScore;
   const isLastRound = g.currentRound >= 3;
 
