@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { connectGame, disconnectGame, send, useGameState } from '@/lib/game/client';
+import { connectGame, disconnectGame, send, addAI, useGameState } from '@/lib/game/client';
 import { Button } from '@/components/ui/button';
-import { Copy, Crown, LogOut, Users, UserX } from 'lucide-react';
+import { Copy, Crown, LogOut, Users, UserX, Bot, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function RoomLobby() {
@@ -46,6 +46,22 @@ export default function RoomLobby() {
     navigate('/');
   };
 
+  const handleAddAI = async () => {
+    try {
+      await addAI();
+      toast.success('已添加机器人');
+    } catch {
+      toast.error('添加失败');
+    }
+  };
+
+  const handleDisband = () => {
+    if (!confirm('确定要解散房间吗？所有玩家将被移出。')) return;
+    send({ type: 'disbandRoom' });
+    disconnectGame();
+    navigate('/');
+  };
+
   // 游戏开始后跳转到游戏页
   useEffect(() => {
     if (room && room.game.phase !== 'waiting' && room.game.phase !== 'ended') {
@@ -70,12 +86,22 @@ export default function RoomLobby() {
             <div className="text-ivory-dim text-sm">鉴宝局 · 等候厅</div>
             <h1 className="font-brush text-4xl text-bronze">十二兽首</h1>
           </div>
-          <button
-            onClick={handleLeave}
-            className="btn-ghost px-4 py-2 rounded-md text-sm flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" /> 离开
-          </button>
+          <div className="flex items-center gap-2">
+            {isHost && (
+              <button
+                onClick={handleDisband}
+                className="btn-ghost px-3 py-2 rounded-md text-sm text-vermilion hover:bg-vermilion/10 flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" /> 解散
+              </button>
+            )}
+            <button
+              onClick={handleLeave}
+              className="btn-ghost px-4 py-2 rounded-md text-sm flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" /> 离开
+            </button>
+          </div>
         </div>
 
         {/* 房间码卡片 */}
@@ -165,13 +191,23 @@ export default function RoomLobby() {
 
           <div className="flex gap-3">
             {isHost && (
-              <Button
-                onClick={handleStart}
-                disabled={!canStart}
-                className="btn-seal flex-1 h-12 text-lg"
-              >
-                {canStart ? '开 设 鉴 宝' : `还需 ${6 - room.players.length} 人`}
-              </Button>
+              <>
+                {room.players.length < room.maxPlayers && (
+                  <Button
+                    onClick={handleAddAI}
+                    className="btn-ghost h-12 px-4 flex items-center gap-2"
+                  >
+                    <Bot className="w-5 h-5" /> 添加机器人
+                  </Button>
+                )}
+                <Button
+                  onClick={handleStart}
+                  disabled={!canStart}
+                  className="btn-seal flex-1 h-12 text-lg"
+                >
+                  {canStart ? '开 设 鉴 宝' : `还需 ${6 - room.players.length} 人`}
+                </Button>
+              </>
             )}
             {!isHost && (
               <div className="flex-1 text-center py-4 text-ivory-dim text-sm">

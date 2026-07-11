@@ -21,61 +21,84 @@ export function runAIAction(code: string): void {
   const phase = room.game.phase;
 
   if (phase === 'appraise') {
-    let acted = false;
-    for (const p of room.players) {
-      if (!p.isAI || !p.role) continue;
-      const role = ROLES[p.role];
-      const check = engine.canAppraise(room, p.id);
+    const round = room.game.rounds[room.game.currentRound - 1];
+    if (!round) return;
 
-      if (p.role === 'laochaofeng' && !room.game.rounds[room.game.currentRound - 1].laochaofengUsedFlip) {
-        if (Math.random() < 0.5) {
-          engine.laochaofengUseFlip(room, p.id, true);
-          acted = true;
-        }
-      }
-      if (p.role === 'yaoburan' && !p.yaoburanSealTarget) {
-        const targets = room.players.filter(t => ROLES[t.role!]?.faction === 'xuyuan' && t.id !== p.id);
-        if (targets.length > 0) {
-          const target = targets[Math.floor(Math.random() * targets.length)];
-          engine.yaoburanSeal(room, p.id, target.id);
-          acted = true;
-        }
-      }
-      if (p.role === 'zhengguoqu' && p.zhengguoquLockedArtifact === undefined) {
-        const round = room.game.rounds[room.game.currentRound - 1];
-        const avail = round.artifacts.filter(a => a.id !== round.lockedArtifactId);
-        if (avail.length > 0) {
-          const target = avail[Math.floor(Math.random() * avail.length)];
-          engine.zhengguoquLock(room, p.id, target.id);
-          acted = true;
-        }
-      }
-      if (p.role === 'fangzhen' && !p.fangzhenCheckTarget) {
-        const targets = room.players.filter(t => t.id !== p.id);
-        if (targets.length > 0) {
-          const target = targets[Math.floor(Math.random() * targets.length)];
-          engine.fangzhenCheck(room, p.id, target.id);
-          acted = true;
-        }
-      }
-      if (check.can && role.appraiseCount > 0) {
-        const round = room.game.rounds[room.game.currentRound - 1];
-        const avail = round.artifacts.filter(a =>
-          a.id !== round.lockedArtifactId &&
-          !room.game.playerRoundStates[p.id][room.game.currentRound].appraisals.some(r => r.artifactId === a.id)
-        );
-        for (let i = 0; i < check.count && avail.length > 0; i++) {
-          const idx = Math.floor(Math.random() * avail.length);
-          const target = avail.splice(idx, 1)[0];
-          engine.appraise(room, p.id, target.id);
-          acted = true;
-        }
+    // 检查当前鉴宝玩家是否是 AI
+    const currentAppraiserId = round.currentAppraiserId;
+    if (!currentAppraiserId) return;
+
+    const currentAppraiser = room.players.find(p => p.id === currentAppraiserId);
+    if (!currentAppraiser) return;
+
+    // 如果当前鉴宝玩家不是 AI，不做任何事
+    if (!currentAppraiser.isAI) return;
+
+    // AI 已完成鉴宝（在 finishedAppraisers 中），不应该出现在这里
+    if (round.finishedAppraisers.includes(currentAppraiserId)) return;
+
+    const p = currentAppraiser;
+    const role = ROLES[p.role!];
+    const check = engine.canAppraise(room, p.id);
+
+    // AI 使用技能（一次性）
+    if (p.role === 'laochaofeng' && !round.laochaofengUsedFlip) {
+      if (Math.random() < 0.5) {
+        engine.laochaofengUseFlip(room, p.id, true);
       }
     }
-    // AI 行动后不自动推进阶段（由房主确认），但如果全是 AI 则自动推进
-    const hasHuman = room.players.some(p => !p.isAI && p.connected);
-    if (!hasHuman) {
+    if (p.role === 'yaoburan' && !p.yaoburanSealTarget) {
+      const targets = room.players.filter(t => ROLES[t.role!]?.faction === 'xuyuan' && t.id !== p.id);
+      if (targets.length > 0) {
+        const target = targets[Math.floor(Math.random() * targets.length)];
+        engine.yaoburanSeal(room, p.id, target.id);
+      }
+    }
+    if (p.role === 'zhengguoqu' && p.zhengguoquLockedArtifact === undefined) {
+      const avail = round.artifacts.filter(a => a.id !== round.lockedArtifactId);
+      if (avail.length > 0) {
+        const target = avail[Math.floor(Math.random() * avail.length)];
+        engine.zhengguoquLock(room, p.id, target.id);
+      }
+    }
+    if (p.role === 'fangzhen' && !p.fangzhenCheckTarget) {
+      const targets = room.players.filter(t => t.id !== p.id);
+      if (targets.length > 0) {
+        const target = targets[Math.floor(Math.random() * targets.length)];
+        engine.fangzhenCheck(room, p.id, target.id);
+      }
+    }
+
+    // AI 执行鉴宝
+    if (check.can && role.appraiseCount > 0) {
+      const avail = round.artifacts.filter(a =>
+        a.id !== round.lockedArtifactId &&
+        !room.game.playerRoundStates[p.id][room.game.currentRound].appraisals.some(r => r.artifactId === a.id)
+      );
+      for (let i = 0; i < check.count && avail.length > 0; i++) {
+        const idx = Math.floor(Math.random() * avail.length);
+        const target = avail.splice(idx, 1)[0];
+        engine.appraise(room, p.id, target.id);
+      }
+    }
+
+    // AI 鉴宝完毕，自动指定下一个玩家
+    const remainingPlayers = round.appraiseOrder.filter(id =>
+      !round.finishedAppraisers.includes(id) && id !== currentAppraiserId
+    );
+    if (remainingPlayers.length > 0) {
+      // 优先选能鉴宝的玩家
+      const nextCanAppraise = remainingPlayers.find(id => engine.canAppraise(room, id).can);
+      const nextId = nextCanAppraise || remainingPlayers[0];
+      engine.passAppraiseTurn(room, currentAppraiserId, nextId);
+    } else {
+      // 所有玩家都完成了，自动进入发言
+      if (!round.finishedAppraisers.includes(currentAppraiserId)) {
+        round.finishedAppraisers.push(currentAppraiserId);
+      }
+      round.currentAppraiserId = undefined;
       engine.enterDiscussPhase(room);
+      round.events.push('全员鉴宝完毕，进入发言环节。');
     }
   } else if (phase === 'discuss') {
     const round = room.game.rounds[room.game.currentRound - 1];

@@ -144,6 +144,20 @@ gameRouter.post('/rooms/:code/leave', (req, res) => {
   res.json({ ok: true });
 });
 
+/** 添加 AI 玩家 */
+gameRouter.post('/rooms/:code/addAI', (req, res) => {
+  const code = req.params.code.toUpperCase();
+  const room = roomManager.getRoom(code);
+  if (!room) return res.status(404).json({ error: '房间不存在' });
+  if (room.game.phase !== 'waiting') return res.status(400).json({ error: '游戏已开始' });
+  if (room.players.length >= room.maxPlayers) return res.status(400).json({ error: '房间已满' });
+  const result = roomManager.addAI(code);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({
+    room: roomManager.toPublicRoom(room, (req.body as any)?.playerId),
+  });
+});
+
 /** 通用行动接口 */
 gameRouter.post('/rooms/:code/action', (req, res) => {
   const code = req.params.code.toUpperCase();
@@ -164,6 +178,12 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
         const kickResult = roomManager.removePlayer(code, msg.targetId);
         if (!kickResult.ok) error = kickResult.error!;
         break;
+      }
+      case 'disbandRoom': {
+        if (!player.isHost) { error = '只有房主可以解散房间'; break; }
+        roomManager.removeRoom(code);
+        res.json({ disbanded: true });
+        return;
       }
       case 'startGame': {
         if (!player.isHost) { error = '只有房主可以开始游戏'; break; }

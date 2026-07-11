@@ -269,6 +269,7 @@ export type ClientMessage =
   | { type: 'speech'; content: string }
   | { type: 'bet'; artifactId: number }
   | { type: 'nextRound' }            // 房主进入下一轮
+  | { type: 'disbandRoom' }         // 房主解散房间
   | { type: 'restart' };
 
 /** 服务端 -> 客户端 消息 */
