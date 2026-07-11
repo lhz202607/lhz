@@ -65,12 +65,23 @@ async function poll(): Promise<void> {
   try {
     const res = await apiClient.post(`/game/rooms/${roomCode}/heartbeat`, { playerId });
     applyHeartbeat(res.data);
+    // 动态调整轮询频率：等待阶段 500ms，游戏中 1000ms
+    const phase = res.data.room?.game?.phase;
+    const targetInterval = phase === 'waiting' ? 500 : 1000;
+    if (pollTimer && currentInterval !== targetInterval) {
+      clearInterval(pollTimer);
+      currentInterval = targetInterval;
+      pollTimer = setInterval(poll, targetInterval);
+    }
   } catch (e) { /* 静默失败 */ }
 }
 
+let currentInterval = 1000;
+
 function startPolling(): void {
   if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(poll, 1500);
+  currentInterval = 1000;
+  pollTimer = setInterval(poll, currentInterval);
 }
 
 function stopPolling(): void {
@@ -94,6 +105,8 @@ export async function connectGame(code: string, name: string, pid?: string): Pro
       myAppraisals: res.data.myAppraisals || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
+      knownAllies: res.data.knownAllies || [],
+      remainingVotes: res.data.remainingVotes || 0,
     });
     startPolling();
   } catch (e: any) {

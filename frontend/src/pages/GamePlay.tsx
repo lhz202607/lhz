@@ -1312,9 +1312,6 @@ function IdentifyPanel({ room, game }: { room: any; game: any }) {
   const myFaction = roleInfo?.faction;
   const myVote = me.identifyTargetId;
 
-  // 许愿阵营投票指认老朝奉
-  // 老朝奉指认许愿
-  // 药不然指认方震
   const targets = room.players.filter((p: any) => p.id !== me.id);
   const isHost = !!me.isHost;
   const allVoted = Object.keys(g.identifyVotes || {}).length;
@@ -1324,6 +1321,34 @@ function IdentifyPanel({ room, game }: { room: any; game: any }) {
       <div className="text-center">
         <div className="text-gold-glow font-brush text-2xl sm:text-3xl mb-1">鉴人环节</div>
         <div className="text-ivory-dim text-xs sm:text-sm">三轮鉴宝结束，指认身份的时刻到了</div>
+      </div>
+
+      {/* 前三轮行动顺序回顾 */}
+      <div className="card-antique p-3">
+        <div className="text-bronze font-antique font-bold mb-2 text-sm flex items-center gap-1">
+          <Target className="w-4 h-4" /> 三轮行动顺序回顾
+        </div>
+        {[1, 2, 3].map(roundNum => {
+          const roundData = (g.rounds || [])[roundNum - 1];
+          const order = roundData?.appraiseOrder || [];
+          if (!order.length) return null;
+          return (
+            <div key={roundNum} className="mb-2 last:mb-0">
+              <div className="text-ivory-dim text-[10px] mb-1">第{roundNum}轮</div>
+              <div className="flex flex-wrap gap-1">
+                {order.map((pid: string, idx: number) => {
+                  const player = room.players.find((p: any) => p.id === pid);
+                  return (
+                    <div key={pid} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-black/20 text-ivory-dim">
+                      <span className="text-ivory-dim">#{idx + 1}</span>
+                      <span className="truncate max-w-[50px]">{player?.name || '?'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="bg-black/20 p-3 rounded-md">
