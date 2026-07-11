@@ -588,21 +588,22 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const sealedRound = game.sealedRounds.includes(g.currentRound);
   const [turnEnded, setTurnEnded] = useState(false);
 
-  if (!roleInfo) return <div className="card-antique p-4">等待角色分配…</div>;
-
-  const canAppraise = roleInfo.appraiseCount > 0 && !sealedRound;
-  const appraisedCount = game.myAppraisals[g.currentRound]?.length || 0;
-  const remaining = roleInfo.appraiseCount - appraisedCount;
   const isMyTurn = g.currentAppraiserId === me.id;
-  const finishedAppraisers = g.finishedAppraisers || [];
-
-  // 判断鉴宝是否完成（次数用完或无法鉴宝）
-  const appraiseDone = !canAppraise || remaining <= 0;
 
   // 当不再是当前鉴宝者时，重置状态
   useEffect(() => {
     if (!isMyTurn) setTurnEnded(false);
   }, [isMyTurn]);
+
+  if (!roleInfo) return <div className="card-antique p-4">等待角色分配…</div>;
+
+  const canAppraise = roleInfo.appraiseCount > 0 && !sealedRound;
+  const appraisedCount = game.myAppraisals[g.currentRound]?.length || 0;
+  const remaining = roleInfo.appraiseCount - appraisedCount;
+  const finishedAppraisers = g.finishedAppraisers || [];
+
+  // 判断鉴宝是否完成（次数用完或无法鉴宝）
+  const appraiseDone = !canAppraise || remaining <= 0;
 
   const handleAppraise = (artifactId: number) => {
     if (remaining <= 0) { toast.error('本轮鉴宝次数已用完'); return; }
