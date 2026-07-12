@@ -717,11 +717,13 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
       {isMyTurn && turnEnded && (
         <>
           {/* 无法鉴宝弹窗提示 */}
-          {appraiseDone && !canAppraise && !sealedRound && (
+          {appraiseDone && !canAppraise && (
             <div className="bg-vermilion/10 border border-vermilion/30 rounded-md p-3 animate-float-in">
               <div className="text-vermilion text-sm font-bold mb-1">本回合无法鉴宝</div>
               <div className="text-ivory-dim text-xs mb-3">
-                {roleInfo.appraiseCount === 0
+                {sealedRound
+                  ? '你被药不然封印，本回合无法鉴宝或发动技能，请指定下一位玩家。'
+                  : roleInfo.appraiseCount === 0
                   ? '你的角色不擅鉴宝，请指定下一位玩家。'
                   : '你的鉴宝次数已用完，请指定下一位玩家。'}
               </div>
