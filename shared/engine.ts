@@ -221,7 +221,7 @@ export function canAppraise(room: Room, playerId: string): { can: boolean; reaso
   // "轮到自己"手动结束回合，而不能被当作"角色无法鉴宝"而自动跳过。
   if (rs.sealed) return { can: false, reason: '本轮已被封印', count: 0 };
   if (rs.randomlyBlocked) return { can: false, reason: '本轮心神不宁', count: 0 };
-  if (rs.fangzhenSealPenalty) return { can: false, reason: '同伴被封印而丧失鉴宝能力', count: 0 };
+  if (rs.fangzhenSealPenalty) return { can: false, reason: '你本轮丧失鉴宝能力', count: 0 };
   if (role.appraiseCount === 0) return { can: false, reason: '该角色无法鉴宝', count: 0 };
   const done = rs.appraisals.length;
   const remaining = role.appraiseCount - done;

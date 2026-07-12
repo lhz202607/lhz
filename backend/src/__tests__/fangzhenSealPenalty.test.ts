@@ -42,7 +42,7 @@ describe('方震被封印 → 许愿连带丧失鉴宝能力', () => {
     expect(room.game.playerRoundStates[xuyuan.id][1].fangzhenSealPenalty).toBe(true)
     const xc = canAppraise(room, xuyuan.id)
     expect(xc.can).toBe(false)
-    expect(xc.reason).toContain('同伴被封印')
+    expect(xc.reason).toContain('你本轮丧失鉴宝能力')
     // 许愿并非被"直接封印"，不应误标 sealed
     expect(room.game.playerRoundStates[xuyuan.id][1].sealed).toBeFalsy()
   })
@@ -83,7 +83,7 @@ describe('方震被封印 → 许愿连带丧失鉴宝能力', () => {
     // 许愿本轮被连带丧失能力
     expect(room.game.playerRoundStates[xuyuan.id][2].fangzhenSealPenalty).toBe(true)
     expect(canAppraise(room, xuyuan.id).can).toBe(false)
-    expect(canAppraise(room, xuyuan.id).reason).toContain('同伴被封印')
+    expect(canAppraise(room, xuyuan.id).reason).toContain('你本轮丧失鉴宝能力')
     // 第 3 轮应恢复（延迟仅一轮）
     const all3 = new Set<number>()
     startRound(room, 3, artifacts, all3)
