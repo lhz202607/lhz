@@ -1018,7 +1018,6 @@ function VotePanel({ room, game }: { room: any; game: any }) {
   const myBets: number[] = me.betArtifactIds || [];
   const remainingVotes = game.remainingVotes || 0;
   const voteFinished = me.finishedVote;
-  const allVoted = room.players.every((p: any) => p.finishedVote || p.betArtifactIds?.length === 0 || p.remainingVotes <= 0);
 
   // 投票结束前不显示票数统计，结束后显示
   const showCounts = g.phase === 'reveal' || g.phase === 'ended';
@@ -1036,8 +1035,8 @@ function VotePanel({ room, game }: { room: any; game: any }) {
   const totalBets = Object.values(betCounts).reduce((a, b) => a + b, 0);
   const maxBet = Math.max(1, ...Object.values(betCounts));
 
-  // 已投票玩家列表
-  const votedPlayers = room.players.filter((p: any) => p.finishedVote || (p.betArtifactIds?.length || 0) > 0);
+  // 已投票玩家列表：与后端 isVoteDone 口径一致（结束投票 / 票已用完 / 机器人）
+  const votedPlayers = room.players.filter((p: any) => p.finishedVote || p.remainingVotes <= 0 || p.isAI);
   const totalPlayers = room.players.length;
 
   return (
@@ -1519,6 +1518,7 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
           const hiddenName = rd.hiddenArtifactName;
           const isReal = rd.revealedIsReal;
           const score = rd.roundScore || 0;
+          const hasVotes = Object.keys(rd.playerVotes || {}).some(pid => (rd.playerVotes![pid]?.length || 0) > 0);
           return (
             <div key={roundNum} className="card-antique p-3 text-left">
               <div className="text-gold-glow text-xs font-bold mb-2 flex items-center justify-between">
@@ -1527,7 +1527,7 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
                   {score > 0 ? '+1 分' : '0 分'}
                 </span>
               </div>
-              {revealedName ? (
+              {hasVotes ? (
                 <div className="space-y-1.5 text-xs">
                   <div className="flex items-center justify-between bg-black/20 px-2 py-1 rounded">
                     <span className="text-ivory-dim">揭示</span>

@@ -34,22 +34,17 @@ export function generateAllArtifacts(): Artifact[] {
   return ZODIAC_NAMES.map((name, i) => ({ id: i, name, isReal: realFlags[i] }));
 }
 
-/** 从已用集合中选取 4 个新兽首（不重复），保证至少 2 真 */
+/** 从已用集合中选取 4 个新兽首（不重复），尽量保证 2 真 2 假 */
 export function pickArtifactsForRound(allArtifacts: Artifact[], usedIds: Set<number>): Artifact[] {
   const available = allArtifacts.filter(a => !usedIds.has(a.id));
-  const reals = available.filter(a => a.isReal);
-  const fakes = available.filter(a => !a.isReal);
-  // 确保至少选 2 真 2 假
-  const pickedReals = shuffle(reals).slice(0, Math.max(2, Math.min(2, reals.length)));
-  const pickedFakes = shuffle(fakes).slice(0, ARTIFACTS_PER_ROUND - pickedReals.length);
-  const picked = shuffle([...pickedReals, ...pickedFakes]);
-  // 如果不够 4 个，从余下的补
-  while (picked.length < ARTIFACTS_PER_ROUND && available.length > picked.length) {
-    const rest = available.find(a => !picked.includes(a));
-    if (rest) picked.push(rest);
-    else break;
-  }
-  return picked;
+  const reals = shuffle(available.filter(a => a.isReal));
+  const fakes = shuffle(available.filter(a => !a.isReal));
+  const picked: Artifact[] = [];
+  // 优先各取 2 个；真品或假品不足时由另一类补足至 4 个
+  const needReals = Math.max(2, ARTIFACTS_PER_ROUND - fakes.length);
+  const needFakes = ARTIFACTS_PER_ROUND - needReals;
+  picked.push(...reals.slice(0, needReals), ...fakes.slice(0, needFakes));
+  return shuffle(picked);
 }
 
 export function createInitialState(): GameState {
@@ -65,7 +60,7 @@ export function createRoom(hostName: string, maxPlayers: number = 8): Room {
   const hostId = generatePlayerId();
   return {
     code: generateRoomCode(), maxPlayers,
-    players: [{ id: hostId, name: hostName, isHost: true, isAI: false, connected: true, betArtifactIds: [], remainingVotes: 2 }],
+    players: [{ id: hostId, name: hostName, isHost: true, isAI: false, connected: true, betArtifactIds: [], remainingVotes: 0 }],
     game: createInitialState(),
     createdAt: Date.now(),
   };
@@ -76,7 +71,7 @@ export function createAIPlayer(name?: string): Player {
   return {
     id: generatePlayerId(), name: name || aiNames[Math.floor(Math.random() * aiNames.length)],
     isHost: false, isAI: true, connected: true,
-    betArtifactIds: [], remainingVotes: 2,
+    betArtifactIds: [], remainingVotes: 0,
   };
 }
 
@@ -381,27 +376,26 @@ export function resolveBets(room: Room): void {
   const hiddenId = entries[0].artifactId;
   round.hiddenArtifactId = hiddenId;
   const hiddenArtifact = round.artifacts.find(a => a.id === hiddenId)!;
+  round.hiddenArtifactName = hiddenArtifact.name;
   round.events.push(`【${hiddenArtifact.name}】票数排名第一（${entries[0].count}票），已被隐藏。`);
 
-  // 第2名：揭示真假
+  // 第2名：揭示真假（即使只有 1 个兽首有票，也揭示该兽首）
   let roundScore = 0;
+  const revealedId = entries.length >= 2 ? entries[1].artifactId : entries[0].artifactId;
+  round.revealedArtifactId = revealedId;
+  const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
+  const revealedIsReal = revealedArtifact.isReal;
+  round.revealedArtifactName = revealedArtifact.name;
+  round.revealedIsReal = revealedIsReal;
   if (entries.length >= 2) {
-    const revealedId = entries[1].artifactId;
-    round.revealedArtifactId = revealedId;
-    const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
-    const revealedIsReal = revealedArtifact.isReal;
-    round.revealedArtifactId = revealedId;
-    round.revealedArtifactName = revealedArtifact.name;
-    round.revealedIsReal = revealedIsReal;
-    round.hiddenArtifactName = hiddenArtifact.name;
     round.events.push(`【${revealedArtifact.name}】票数排名第二（${entries[1].count}票），予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
-    if (revealedIsReal) {
-      room.game.xuyuanScore += 1;
-      roundScore = 1;
-      round.events.push('揭露真品，许愿阵营 +1 分。');
-    }
   } else {
-    round.hiddenArtifactName = hiddenArtifact.name;
+    round.events.push(`【${revealedArtifact.name}】唯一获投票兽首（${entries[0].count}票），予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
+  }
+  if (revealedIsReal) {
+    room.game.xuyuanScore += 1;
+    roundScore = 1;
+    round.events.push('揭露真品，许愿阵营 +1 分。');
   }
   round.roundScore = roundScore;
 
@@ -439,14 +433,12 @@ export function identifyVote(room: Room, playerId: string, targetId: string): { 
   if (!target) return { ok: false, error: '目标不存在' };
   // 不能投自己
   if (playerId === targetId) return { ok: false, error: '不能指认自己' };
-  // 老朝奉阵营的人不能投自己阵营的人
   const myFaction = ROLES[player.role!].faction;
   const targetFaction = ROLES[target.role!].faction;
-  // 限制投票规则：
-  // - 许愿阵营：投票指认老朝奉
-  // - 老朝奉（老朝奉本人）：指认许愿
-  // - 药不然：指认方震
-  // - 郑国渠：可以跟老朝奉或药不然投（但他不知道队友是谁，所以可以随便投）
+  // 老朝奉阵营（老朝奉、药不然）不能指认自己阵营的人；郑国渠不知道队友，可随便投
+  if (myFaction === 'laochaofeng' && targetFaction === 'laochaofeng') {
+    return { ok: false, error: '不能指认自己阵营的同伴' };
+  }
   player.identifyTargetId = targetId;
   room.game.identifyVotes[playerId] = targetId;
   return { ok: true };
