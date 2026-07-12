@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Fix round order first and AI skip blocked",
+  "version_description": "Fix AI last turn and anonymize flip hint",
   "preview_type": "pc"
 }
