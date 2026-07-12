@@ -753,19 +753,37 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
       )}
 
       {/* 完成鉴宝按钮（房主） */}
-      {me.isHost && (
-        <div className="pt-2 border-t border-bronze/20">
-          <Button
-            onClick={() => send({ type: 'finishAppraise' })}
-            className="btn-bronze w-full h-10"
-          >
-            所有人鉴宝完毕 · 进入发言
-          </Button>
-          <div className="text-ivory-dim text-xs text-center mt-1">
-            确认全员完成鉴宝与技能后点击推进
+      {me.isHost && (() => {
+        const curR = g.currentRound;
+        const rnd = g.rounds?.[curR - 1];
+        const finishedSet = rnd?.finishedAppraisers || [];
+        const allAppraised = room.players.every((p: any) => {
+          const rs = game.playerRoundStates?.[p.id]?.[curR];
+          const cannot = rs && (rs.sealed || rs.randomlyBlocked);
+          const noAppraise = p.role && (ROLE_INFO as any)[p.role]?.appraiseCount === 0;
+          return finishedSet.includes(p.id) || cannot || noAppraise;
+        });
+        const doneCount = room.players.filter((p: any) => {
+          const rs = game.playerRoundStates?.[p.id]?.[curR];
+          const cannot = rs && (rs.sealed || rs.randomlyBlocked);
+          const noAppraise = p.role && (ROLE_INFO as any)[p.role]?.appraiseCount === 0;
+          return finishedSet.includes(p.id) || cannot || noAppraise;
+        }).length;
+        return (
+          <div className="pt-2 border-t border-bronze/20">
+            <Button
+              onClick={() => send({ type: 'finishAppraise' })}
+              className="btn-bronze w-full h-10"
+              disabled={!allAppraised}
+            >
+              {allAppraised ? '进入发言环节' : `待鉴宝完成 ${doneCount}/${room.players.length}`}
+            </Button>
+            <div className="text-ivory-dim text-xs text-center mt-1">
+              {allAppraised ? '全员已完成鉴宝' : '需所有玩家完成鉴宝（或本轮无法鉴宝）后方可进入发言'}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 鉴宝结果弹窗 */}
       {popupResult && (() => {
@@ -807,35 +825,41 @@ function AppraiseOrderPanel({ room, game }: { room: any; game: any }) {
         <Target className="w-4 h-4" /> 行动顺序
       </div>
       {[1, 2, 3].map(roundNum => {
-        // 尝试获取该轮数据
         const roundData = roundNum <= currentRound ? (g.rounds || [])[roundNum - 1] : null;
         const order = roundData?.appraiseOrder || (roundNum === currentRound ? g.appraiseOrder : null);
         if (!order || order.length === 0) return null;
         const isCurrent = roundNum === currentRound;
 
         return (
-          <div key={roundNum} className={`mb-2 last:mb-0 ${!isCurrent ? 'opacity-60' : ''}`}>
-            <div className="text-ivory-dim text-[10px] mb-1 flex items-center gap-1">
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-gold-glow' : 'bg-bronze/40'}`}></span>
-              第{roundNum}轮{isCurrent ? '（当前）' : ''}
+          <div key={roundNum} className={`mb-3 last:mb-0 ${!isCurrent ? 'opacity-50' : ''}`}>
+            <div className="text-ivory-dim text-[11px] mb-1.5 flex items-center gap-1.5">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-gold-glow animate-glow' : 'bg-bronze/40'}`}></span>
+              第{roundNum}轮{isCurrent ? ' · 当前' : ' · 已完成'}
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-col gap-1">
               {order.map((pid: string, idx: number) => {
                 const player = room.players.find((p: any) => p.id === pid);
                 const isFinished = roundData?.finishedAppraisers?.includes(pid);
                 const isCurrentAppraiser = isCurrent && g.currentAppraiserId === pid;
+                const isMe = pid === game.me?.id;
                 return (
                   <div
                     key={pid}
-                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
-                      isCurrentAppraiser ? 'bg-gold-glow/20 text-gold-glow border border-gold-glow/40' :
-                      isFinished ? 'bg-jade/10 text-jade/70' :
-                      'bg-black/20 text-ivory-dim'
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all ${
+                      isCurrentAppraiser
+                        ? 'bg-gold-glow/15 text-gold-glow border border-gold-glow/50 ring-active'
+                        : isFinished
+                        ? 'bg-black/20 text-ivory-dim line-through decoration-jade/40'
+                        : 'bg-black/30 text-ivory'
                     }`}
                   >
-                    <span className="text-ivory-dim">#{idx + 1}</span>
-                    <span className="truncate max-w-[50px]">{player?.name || '?'}</span>
-                    {isCurrentAppraiser && <span className="text-[8px]">鉴宝中</span>}
+                    <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      isCurrentAppraiser ? 'bg-gold-glow text-ink' : isFinished ? 'bg-jade/30 text-jade' : 'bg-bronze/30 text-bronze'
+                    }`}>
+                      {isFinished && !isCurrentAppraiser ? '✓' : idx + 1}
+                    </span>
+                    <span className={`flex-1 truncate ${isMe ? 'font-bold' : ''}`}>{player?.name || '?'}{isMe ? '（我）' : ''}</span>
+                    {isCurrentAppraiser && <span className="text-[10px] font-bold animate-pulse">鉴宝中</span>}
                   </div>
                 );
               })}
@@ -917,24 +941,33 @@ function SkillPanel({ room, game }: { room: any; game: any }) {
 
   // 药不然：封印
   if (myRole === 'yaoburan') {
+    const usedTargetId = me.yaoburanSealTarget;
+    const usedTarget = usedTargetId ? room.players.find((p: any) => p.id === usedTargetId) : null;
+    const usedThisRound = !!usedTargetId;
     const targets = room.players.filter((p: any) => p.id !== me.id && !p.visiblySealed);
     return (
       <div className="bg-black/20 p-3 rounded-md border border-bronze/20">
         <div className="text-sm text-bronze font-bold mb-1 flex items-center gap-1">
           <Lock className="w-4 h-4" /> 封印之术
         </div>
-        <div className="text-xs text-ivory-dim mb-2">选择一名玩家封印，使其本轮无法鉴宝且技能失效。</div>
-        <div className="flex flex-wrap gap-1.5">
-          {targets.map((p: any) => (
-            <button
-              key={p.id}
-              onClick={() => send({ type: 'yaoburanSeal', targetId: p.id })}
-              className="btn-ghost px-3 py-1 rounded text-xs"
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
+        <div className="text-xs text-ivory-dim mb-2">选择一名玩家封印，使其本轮无法鉴宝且技能失效（每轮仅一次）。</div>
+        {usedThisRound ? (
+          <div className="pill pill-danger flex items-center gap-1.5 w-full justify-center py-1.5">
+            <Lock className="w-3 h-3" /> 本轮已偷袭：{usedTarget?.name || '—'}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {targets.map((p: any) => (
+              <button
+                key={p.id}
+                onClick={() => send({ type: 'yaoburanSeal', targetId: p.id })}
+                className="btn-ghost px-3 py-1 rounded text-xs"
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

@@ -143,6 +143,7 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
     roundNumber, phase: 'appraise', speechOrder, currentSpeakerIndex: 0,
     artifacts, laochaofengUsedFlip: false, betCounts: {}, events: [],
     currentAppraiserId: firstAppraiser, appraiseOrder, finishedAppraisers: [],
+    yaoburanSealUsedThisRound: false,
   };
 
   game.rounds[roundNumber - 1] = round;
@@ -274,6 +275,8 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
   if (!round) return { ok: false, error: '当前无进行中的轮次' };
   const rs = room.game.playerRoundStates[targetId]?.[room.game.currentRound];
   if (!rs) return { ok: false, error: '目标状态未初始化' };
+  // 每轮仅可偷袭一次
+  if (round.yaoburanSealUsedThisRound) return { ok: false, error: '本轮已偷袭过一次' };
   player.yaoburanSealTarget = targetId;
 
   // 判断目标是否为药不然的「前置位」玩家（行动顺序中排在药不然之前）
@@ -287,6 +290,7 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
     room.game.pendingSeals[targetId] = room.game.currentRound + 1;
     const tname = target.name;
     round.events.push(`药不然封印了${tname}（前置位），封印将于下一轮生效。`);
+    round.yaoburanSealUsedThisRound = true;
     return { ok: true, delayed: true };
   } else {
     // 非前置位：本轮立即生效
@@ -297,6 +301,7 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
       round.events.push(`药不然封印了${target.name}（后置位），方震本轮被封印，许愿不受影响。`);
     }
   }
+  round.yaoburanSealUsedThisRound = true;
   return { ok: true };
 }
 

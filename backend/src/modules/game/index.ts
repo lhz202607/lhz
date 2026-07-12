@@ -194,6 +194,16 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
       case 'finishAppraise': {
         if (!player.isHost) { error = '由房主推进阶段'; break; }
         if (room.game.phase !== 'appraise') { error = '当前非鉴宝阶段'; break; }
+        // 必须所有玩家都已完成鉴宝（或本轮无法鉴宝）才能进入发言
+        const cur = room.game.currentRound;
+        const rnd = room.game.rounds[cur - 1];
+        const allDone = room.players.every((p: any) => {
+          const rs = room.game.playerRoundStates[p.id]?.[cur];
+          const cannot = rs && (rs.sealed || rs.randomlyBlocked);
+          const noAppraise = p.role && ROLES[p.role as RoleId].appraiseCount === 0;
+          return rnd.finishedAppraisers.includes(p.id) || cannot || noAppraise;
+        });
+        if (!allDone) { error = '尚有玩家未完成鉴宝'; break; }
         engine.enterDiscussPhase(room);
         break;
       }

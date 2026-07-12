@@ -4,6 +4,7 @@
 
 import { useSyncExternalStore } from 'react';
 import apiClient from '@/lib/api-client';
+import { toast } from 'sonner';
 import { ClientMessage, PublicRoom, RoleId, AppraisalResult, Faction } from '@/shared/types';
 
 interface GameState {
@@ -129,8 +130,7 @@ export async function send(msg: ClientMessage): Promise<void> {
     });
   } catch (e: any) {
     const errMsg = e.response?.data?.error || '操作失败';
-    setState({ error: errMsg });
-    setTimeout(() => { setState({ error: state.error === errMsg ? null : state.error }); }, 3000);
+    toast.error(errMsg);
   }
 }
 

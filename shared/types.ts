@@ -173,6 +173,8 @@ export interface GameRound {
   finishedAppraisers: string[];
   /** 投票明细（投票结束后记录每位玩家投了哪些兽首） */
   playerVotes?: Record<string, number[]>;
+  /** 药不然本轮是否已发动过偷袭（每轮仅一次） */
+  yaoburanSealUsedThisRound?: boolean;
 }
 
 export interface GameState {
