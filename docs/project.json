@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局·十二兽首",
   "app_slug": "antique-game",
-  "version_description": "Fix history modal artifact name not showing",
+  "version_description": "Add undo vote, vote history, action order",
   "preview_type": "pc"
 }

@@ -474,7 +474,7 @@ export function finishVoteForPlayer(room: Room, playerId: string): { ok: boolean
 }
 
 export function isVoteDone(room: Room): boolean {
-  return room.players.every(p => p.remainingVotes <= 0 || p.finishedVote || p.isAI);
+  return room.players.every(p => p.finishedVote || p.isAI);
 }
 
 export function resolveBets(room: Room): void {
