@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Remove background music feature",
+  "version_description": "Add appraisal popup and pass full role tests",
   "preview_type": "pc"
 }

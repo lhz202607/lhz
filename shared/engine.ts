@@ -52,7 +52,7 @@ export function createInitialState(): GameState {
     phase: 'waiting', currentRound: 1, rounds: [],
     xuyuanScore: 0, targetScore: TARGET_SCORE,
     endLog: [], playerRoundStates: {},
-    identifyVotes: {}, skipRoundsMap: {},
+    identifyVotes: {}, skipRoundsMap: {}, pendingSeals: {},
   };
 }
 
@@ -163,7 +163,20 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
   room.players.forEach(p => {
     if (!game.playerRoundStates[p.id]) game.playerRoundStates[p.id] = {};
     const randomlyBlocked = game.skipRoundsMap?.[p.id] === roundNumber;
-    game.playerRoundStates[p.id][roundNumber] = { sealed: false, randomlyBlocked, appraisals: [] };
+    // 应用上一轮药不然对前置位玩家的延迟封印（仅生效一轮）
+    let sealed = false;
+    if (game.pendingSeals[p.id] === roundNumber) {
+      sealed = true;
+      delete game.pendingSeals[p.id];
+      // 若被延迟封印的是方震，下一轮许愿同时被连带封印
+      if (p.role === 'fangzhen') {
+        const xuyuan = room.players.find(x => x.role === 'xuyuan');
+        if (xuyuan && game.playerRoundStates[xuyuan.id]?.[roundNumber]) {
+          game.playerRoundStates[xuyuan.id][roundNumber].sealed = true;
+        }
+      }
+    }
+    game.playerRoundStates[p.id][roundNumber] = { sealed, randomlyBlocked, appraisals: [] };
   });
 }
 
@@ -250,21 +263,39 @@ export function laochaofengUseFlip(room: Room, playerId: string, use: boolean): 
   return { ok: true };
 }
 
-export function yaoburanSeal(room: Room, playerId: string, targetId: string): { ok: boolean; error?: string } {
+export function yaoburanSeal(room: Room, playerId: string, targetId: string): { ok: boolean; delayed?: boolean; error?: string } {
   const player = room.players.find(p => p.id === playerId);
   if (!player || player.role !== 'yaoburan') return { ok: false, error: '只有药不然可使用此技能' };
   if (playerId === targetId) return { ok: false, error: '不能封印自己' };
   const target = room.players.find(p => p.id === targetId);
   if (!target) return { ok: false, error: '目标不存在' };
   if (room.game.phase !== 'appraise') return { ok: false, error: '仅鉴宝阶段可使用' };
+  const round = room.game.rounds[room.game.currentRound - 1];
+  if (!round) return { ok: false, error: '当前无进行中的轮次' };
   const rs = room.game.playerRoundStates[targetId]?.[room.game.currentRound];
   if (!rs) return { ok: false, error: '目标状态未初始化' };
-  rs.sealed = true;
   player.yaoburanSealTarget = targetId;
-  if (target.role === 'jiyunfu') target.permanentlyDisabled = true;
-  if (target.role === 'fangzhen') {
-    const xuyuan = room.players.find(p => p.role === 'xuyuan');
-    if (xuyuan) { const xrs = room.game.playerRoundStates[xuyuan.id]?.[room.game.currentRound]; if (xrs) xrs.sealed = true; }
+
+  // 判断目标是否为药不然的「前置位」玩家（行动顺序中排在药不然之前）
+  const order = room.game.rounds[room.game.currentRound - 1]?.appraiseOrder || [];
+  const ybrPos = order.indexOf(playerId);
+  const targetPos = order.indexOf(targetId);
+  const isPredecessor = ybrPos >= 0 && targetPos >= 0 && targetPos < ybrPos;
+
+  if (isPredecessor) {
+    // 前置位：延迟到下一轮生效，本轮照常鉴宝
+    room.game.pendingSeals[targetId] = room.game.currentRound + 1;
+    const tname = target.name;
+    round.events.push(`药不然封印了${tname}（前置位），封印将于下一轮生效。`);
+    return { ok: true, delayed: true };
+  } else {
+    // 非前置位：本轮立即生效
+    rs.sealed = true;
+    if (target.role === 'jiyunfu') target.permanentlyDisabled = true;
+    if (target.role === 'fangzhen') {
+      const xuyuan = room.players.find(p => p.role === 'xuyuan');
+      if (xuyuan) { const xrs = room.game.playerRoundStates[xuyuan.id]?.[room.game.currentRound]; if (xrs) xrs.sealed = true; }
+    }
   }
   return { ok: true };
 }

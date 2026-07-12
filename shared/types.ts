@@ -189,6 +189,8 @@ export interface GameState {
   identifyVotes: Record<string, string>;
   /** 预先设定的跳过轮次：playerId -> roundNumber（木户加奈/黄烟烟随机一轮无法鉴宝） */
   skipRoundsMap: Record<string, number>;
+  /** 药不然对前置位玩家的延迟封印：targetId -> 生效轮次（本轮不生效，下轮生效） */
+  pendingSeals: Record<string, number>;
 }
 
 export interface Room {
