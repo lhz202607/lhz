@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Fix AI last turn and anonymize flip hint",
+  "version_description": "Fix last appraiser finishAppraise allDone check",
   "preview_type": "pc"
 }
