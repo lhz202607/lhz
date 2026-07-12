@@ -61,11 +61,17 @@ export function runAIAction(code: string): void {
       }
     }
 
-    // 传递回合
-    const remaining = round.appraiseOrder.filter(id => !round.finishedAppraisers.includes(id) && id !== currentAppraiserId);
-    if (remaining.length > 0) {
-      const next = remaining.find(id => engine.canAppraise(room, id).can) || remaining[0];
-      engine.passAppraiseTurn(room, currentAppraiserId, next);
+    // 传递回合：严格按 appraiseOrder 相对顺序选"下一位"（含被封印/随机无法鉴宝的玩家，
+    // 也需轮到其手动结束，不能自动跳过）
+    const order = round.appraiseOrder;
+    const curIdx = order.indexOf(currentAppraiserId);
+    let nextId: string | undefined;
+    for (let k = 1; k <= order.length; k++) {
+      const candId = order[(curIdx + k) % order.length];
+      if (!round.finishedAppraisers.includes(candId)) { nextId = candId; break; }
+    }
+    if (nextId) {
+      engine.passAppraiseTurn(room, currentAppraiserId, nextId);
     } else {
       if (!round.finishedAppraisers.includes(currentAppraiserId)) round.finishedAppraisers.push(currentAppraiserId);
       round.currentAppraiserId = undefined;

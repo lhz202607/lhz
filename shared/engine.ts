@@ -150,11 +150,14 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
 
   const speechOrder = shuffle(room.players.map(p => p.id));
 
-  // 行动顺序：上一轮末位玩家自动成为本轮首位，其余随机
+  // 行动顺序：上一轮【实际最后行动】的玩家自动成为本轮首位，其余随机
   let appraiseOrder: string[];
   const prevRound = game.rounds[roundNumber - 2]; // 上一轮（如果有）
-  if (prevRound?.appraiseOrder && prevRound.appraiseOrder.length > 0) {
-    const lastAppraiser = prevRound.appraiseOrder[prevRound.appraiseOrder.length - 1];
+  const prevActual = prevRound?.actualOrder && prevRound.actualOrder.length > 0
+    ? prevRound.actualOrder
+    : prevRound?.appraiseOrder;
+  if (prevActual && prevActual.length > 0) {
+    const lastAppraiser = prevActual[prevActual.length - 1];
     const others = shuffle(room.players.map(p => p.id).filter(id => id !== lastAppraiser));
     appraiseOrder = [lastAppraiser, ...others];
   } else {
