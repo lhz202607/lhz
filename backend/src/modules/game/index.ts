@@ -105,7 +105,7 @@ gameRouter.post('/rooms/:code/heartbeat', (req, res) => {
       faction: viewer.fangzhenCheckResult,
     }] : [],
     sealedRounds: Object.entries(room.game.playerRoundStates[playerId] || {})
-      .filter(([_, s]) => (s as any).sealed).map(([r]) => Number(r)),
+      .filter(([_, s]) => (s as any).sealed || (s as any).randomlyBlocked).map(([r]) => Number(r)),
     knownAllies: engine.getKnownAllies(room, playerId),
     remainingVotes: viewer?.remainingVotes || 0,
   });
@@ -275,7 +275,7 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
       faction: viewer.fangzhenCheckResult,
     }] : [],
     sealedRounds: Object.entries(room.game.playerRoundStates[playerId] || {})
-      .filter(([_, s]) => (s as any).sealed).map(([r]) => Number(r)),
+      .filter(([_, s]) => (s as any).sealed || (s as any).randomlyBlocked).map(([r]) => Number(r)),
     knownAllies: engine.getKnownAllies(room, playerId),
     remainingVotes: viewer?.remainingVotes || 0,
   });
