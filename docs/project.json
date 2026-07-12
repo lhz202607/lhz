@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局·十二兽首",
   "app_slug": "antique-game",
-  "version_description": "Add undo vote, vote history, action order",
+  "version_description": "Fix auto reveal before manual vote end",
   "preview_type": "pc"
 }
