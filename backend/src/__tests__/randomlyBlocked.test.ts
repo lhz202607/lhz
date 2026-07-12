@@ -33,6 +33,7 @@ describe('随机无法鉴宝（木户加奈/黄烟烟）手动结束回合流程
 
     // 当前行动者设为正常玩家，并把回合传给被封锁玩家
     round.currentAppraiserId = room.players.find(p => p.role === 'xuyuan')!.id
+    round.actualOrder = [round.currentAppraiserId] // 重置实际顺序链，避免随机首位的干扰
     const before = round.finishedAppraisers.length
     const res = passAppraiseTurn(room, round.currentAppraiserId, blocked.id)
     expect(res.ok).toBe(true)

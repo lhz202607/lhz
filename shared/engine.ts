@@ -212,14 +212,16 @@ export function canAppraise(room: Room, playerId: string): { can: boolean; reaso
   const player = room.players.find(p => p.id === playerId);
   if (!player || !player.role) return { can: false, reason: '未分配角色', count: 0 };
   const role = ROLES[player.role];
-  if (role.appraiseCount === 0) return { can: false, reason: '该角色无法鉴宝', count: 0 };
   if (player.permanentlyDisabled) return { can: false, reason: '已被永久封印', count: 0 };
   const round = room.game.rounds[room.game.currentRound - 1];
   if (!round) return { can: false, reason: '当前无进行中的轮次', count: 0 };
   const rs = room.game.playerRoundStates[playerId]?.[room.game.currentRound];
   if (!rs) return { can: false, reason: '状态未初始化', count: 0 };
+  // 封印 / 心神不宁优先判定：即便该角色本就不鉴宝（如方震预言家），被封印也应
+  // "轮到自己"手动结束回合，而不能被当作"角色无法鉴宝"而自动跳过。
   if (rs.sealed) return { can: false, reason: '本轮已被封印', count: 0 };
   if (rs.randomlyBlocked) return { can: false, reason: '本轮心神不宁', count: 0 };
+  if (role.appraiseCount === 0) return { can: false, reason: '该角色无法鉴宝', count: 0 };
   const done = rs.appraisals.length;
   const remaining = role.appraiseCount - done;
   if (remaining <= 0) return { can: false, reason: '次数已用完', count: 0 };
