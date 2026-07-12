@@ -145,6 +145,10 @@ class RoomManager {
           appraiseOrder: r.appraiseOrder,
           finishedAppraisers: r.finishedAppraisers,
           playerVotes: r.playerVotes,
+          hiddenArtifactName: r.hiddenArtifactName,
+          revealedArtifactName: r.revealedArtifactName,
+          revealedIsReal: r.revealedIsReal,
+          roundScore: r.roundScore || 0,
         })),
       },
     };

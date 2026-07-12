@@ -161,7 +161,11 @@ export interface GameRound {
   betCounts: Record<number, number>;
   hiddenArtifactId?: number;
   revealedArtifactId?: number;
+  revealedArtifactName?: string;
   revealedIsReal?: boolean;
+  hiddenArtifactName?: string;
+  /** 本轮许愿阵营得分增量（揭示真品+1，鉴人环节另计） */
+  roundScore?: number;
   events: string[];
   currentAppraiserId?: string;
   /** 鉴宝行动顺序（所有玩家随机排列） */
@@ -269,7 +273,15 @@ export interface PublicRoom {
     /** 鉴人环节投票状态 */
     identifyVotes: Record<string, string>;
     /** 历史轮次数据（行动顺序等） */
-    rounds: { appraiseOrder: string[]; finishedAppraisers: string[]; playerVotes?: Record<string, number[]> }[];
+    rounds: {
+      appraiseOrder: string[];
+      finishedAppraisers: string[];
+      playerVotes?: Record<string, number[]>;
+      hiddenArtifactName?: string;
+      revealedArtifactName?: string;
+      revealedIsReal?: boolean;
+      roundScore?: number;
+    }[];
   };
 }
 

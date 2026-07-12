@@ -384,18 +384,26 @@ export function resolveBets(room: Room): void {
   round.events.push(`【${hiddenArtifact.name}】票数排名第一（${entries[0].count}票），已被隐藏。`);
 
   // 第2名：揭示真假
+  let roundScore = 0;
   if (entries.length >= 2) {
     const revealedId = entries[1].artifactId;
     round.revealedArtifactId = revealedId;
     const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
     const revealedIsReal = revealedArtifact.isReal;
+    round.revealedArtifactId = revealedId;
+    round.revealedArtifactName = revealedArtifact.name;
     round.revealedIsReal = revealedIsReal;
+    round.hiddenArtifactName = hiddenArtifact.name;
     round.events.push(`【${revealedArtifact.name}】票数排名第二（${entries[1].count}票），予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
     if (revealedIsReal) {
       room.game.xuyuanScore += 1;
+      roundScore = 1;
       round.events.push('揭露真品，许愿阵营 +1 分。');
     }
+  } else {
+    round.hiddenArtifactName = hiddenArtifact.name;
   }
+  round.roundScore = roundScore;
 
   // 记录每位玩家投票明细，供前端展示
   round.playerVotes = {};

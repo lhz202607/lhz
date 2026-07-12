@@ -1509,6 +1509,51 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
         </>
       )}
 
+      {/* 每轮鉴宝回顾 */}
+      <div className="text-bronze font-antique font-bold mb-3 text-sm sm:text-base">每轮鉴宝回顾</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+        {[1, 2, 3].map(roundNum => {
+          const rd = (g.rounds || [])[roundNum - 1];
+          if (!rd) return null;
+          const revealedName = rd.revealedArtifactName;
+          const hiddenName = rd.hiddenArtifactName;
+          const isReal = rd.revealedIsReal;
+          const score = rd.roundScore || 0;
+          return (
+            <div key={roundNum} className="card-antique p-3 text-left">
+              <div className="text-gold-glow text-xs font-bold mb-2 flex items-center justify-between">
+                <span>第 {roundNum} 轮</span>
+                <span className={score > 0 ? 'text-jade' : 'text-ivory-dim'}>
+                  {score > 0 ? '+1 分' : '0 分'}
+                </span>
+              </div>
+              {revealedName ? (
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between bg-black/20 px-2 py-1 rounded">
+                    <span className="text-ivory-dim">揭示</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-ivory">{revealedName}</span>
+                      <span className={isReal ? 'text-jade font-bold' : 'text-vermilion font-bold'}>
+                        {isReal ? '真' : '假'}
+                      </span>
+                    </span>
+                  </div>
+                  {hiddenName && (
+                    <div className="flex items-center justify-between bg-black/20 px-2 py-1 rounded">
+                      <span className="text-ivory-dim">隐藏</span>
+                      <span className="text-ivory">{hiddenName}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-ivory-dim text-xs">本轮无投票记录</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="divider-antique"></div>
+
       {/* 身份揭晓 — 按阵营分组 */}
       <div className="text-bronze font-antique font-bold mb-3 text-sm sm:text-base">身份揭晓</div>
 
