@@ -1211,7 +1211,7 @@ function FangzhenSkillPanel({ room, game, me, g }: { room: any; game: any; me: a
     }
   }, [checked?.round, checked?.targetId]);
 
-  const factionName = checked?.faction === 'xuyuan' ? '好人阵营（许愿）' : '坏人阵营（老朝奉）';
+  const factionName = checked?.faction === 'xuyuan' ? '好人阵营' : '坏人阵营';
   const factionColor = checked?.faction === 'xuyuan' ? 'text-jade border-jade' : 'text-vermilion border-vermilion';
 
   return (
@@ -1593,7 +1593,7 @@ function IdentifyPanel({ room, game }: { room: any; game: any }) {
         </div>
         {[1, 2, 3].map(roundNum => {
           const roundData = (g.rounds || [])[roundNum - 1];
-          const order = roundData?.appraiseOrder || [];
+          const order = roundData?.actualOrder || roundData?.appraiseOrder || [];
           if (!order.length) return null;
           return (
             <div key={roundNum} className="mb-2 last:mb-0">

@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Fix last appraiser finishAppraise allDone check",
+  "version_description": "Add history actions modal collapsible identity",
   "preview_type": "pc"
 }
