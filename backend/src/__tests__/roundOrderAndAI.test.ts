@@ -77,4 +77,24 @@ describe('行动顺序：下轮首位跟随本轮实际末位 + AI 不跳过 blo
     expect(r1.currentAppraiserId).toBe(blocked.id)
     expect(r1.finishedAppraisers.includes(blocked.id)).toBe(false)
   })
+
+  it('问题1：AI 是最后一位行动者时，能正常结束本轮（不传给自己卡死）', () => {
+    const roles: RoleId[] = ['xuyuan', 'yaoburan', 'fangzhen', 'huangyanyan', 'muhujianai', 'laochaofeng', 'zhengguoqu', 'jiyunfu']
+    const room = setup(roles)
+    const arts = generateAllArtifacts()
+    const used = new Set<number>()
+    startRound(room, 1, arts, used)
+    const r1 = room.game.rounds[0]
+    // 让前 7 位全部 finished，仅留最后一位（顺序末位）为未 finished 的 AI
+    const last = r1.appraiseOrder[r1.appraiseOrder.length - 1]
+    r1.appraiseOrder.forEach(id => { if (id !== last) r1.finishedAppraisers.push(id) })
+    const lastPlayer = room.players.find(p => p.id === last)!
+    lastPlayer.isAI = true
+    r1.currentAppraiserId = last
+    runAIAction(room.code)
+    // 本轮应结束，进入讨论
+    expect(room.game.phase).toBe('discuss')
+    expect(r1.finishedAppraisers.includes(last)).toBe(true)
+    expect(r1.currentAppraiserId).toBeUndefined()
+  })
 })

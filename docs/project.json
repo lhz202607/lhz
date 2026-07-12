@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Restrict seal info to yaoburan only",
+  "version_description": "Fix round order first and AI skip blocked",
   "preview_type": "pc"
 }

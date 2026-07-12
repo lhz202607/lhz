@@ -302,7 +302,7 @@ export default function GamePlay() {
                     })}
                     {g.flipUsedThisRound && roleInfo.faction === 'xuyuan' && roleInfo.id !== 'jiyunfu' && (
                       <div className="text-[10px] text-vermilion mt-1 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> 老朝奉已用颠倒，结果真假难辨！
+                        <Sparkles className="w-3 h-3" /> 本轮鉴定结果或有颠倒，真假难辨！
                       </div>
                     )}
                   </div>
@@ -688,6 +688,10 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
     send({ type: 'passAppraiseTurn', nextPlayerId });
   };
 
+  const handleFinish = () => {
+    send({ type: 'finishAppraise' });
+  };
+
   return (
     <div className="card-antique p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -792,6 +796,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
             game={game}
             finishedAppraisers={finishedAppraisers}
             onPass={handlePassTurn}
+            onFinish={handleFinish}
           />
         </>
       )}
@@ -934,11 +939,12 @@ function AppraiseOrderPanel({ room, game }: { room: any; game: any }) {
 // ============================================================
 // 指定下一个鉴宝玩家面板
 // ============================================================
-function PassTurnPanel({ room, game, finishedAppraisers, onPass }: {
+function PassTurnPanel({ room, game, finishedAppraisers, onPass, onFinish }: {
   room: any;
   game: any;
   finishedAppraisers: string[];
   onPass: (nextPlayerId: string) => void;
+  onFinish: () => void;
 }) {
   const me = game.me;
   const candidates = room.players.filter((p: any) =>
@@ -964,7 +970,9 @@ function PassTurnPanel({ room, game, finishedAppraisers, onPass }: {
         ))}
       </div>
       {candidates.length === 0 && (
-        <div className="text-ivory-dim text-xs">所有人已鉴宝完毕</div>
+        <Button onClick={onFinish} className="btn-bronze w-full h-10 mt-1 text-sm">
+          进入发言环节
+        </Button>
       )}
     </div>
   );

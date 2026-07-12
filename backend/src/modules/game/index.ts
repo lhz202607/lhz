@@ -200,7 +200,6 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
         break;
       }
       case 'finishAppraise': {
-        if (!player.isHost) { error = '由房主推进阶段'; break; }
         if (room.game.phase !== 'appraise') { error = '当前非鉴宝阶段'; break; }
         // 必须所有玩家都已完成鉴宝（或本轮无法鉴宝）才能进入发言
         const cur = room.game.currentRound;
@@ -212,6 +211,9 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
           return rnd.finishedAppraisers.includes(p.id) || cannot || noAppraise;
         });
         if (!allDone) { error = '尚有玩家未完成鉴宝'; break; }
+        // 房主可推进；或最后一位行动玩家（当前行动者）自行结束本轮
+        const isLastAppraiser = rnd.currentAppraiserId === playerId;
+        if (!player.isHost && !isLastAppraiser) { error = '由房主或末位玩家推进阶段'; break; }
         engine.enterDiscussPhase(room);
         break;
       }

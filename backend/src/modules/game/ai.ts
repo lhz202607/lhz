@@ -62,22 +62,24 @@ export function runAIAction(code: string): void {
     }
 
     // 传递回合：严格按 appraiseOrder 相对顺序选"下一位"（含被封印/随机无法鉴宝的玩家，
-    // 也需轮到其手动结束，不能自动跳过）
+    // 也需轮到其手动结束，不能自动跳过）。注意排除自己，避免末位时传给自己报错卡死。
     const order = round.appraiseOrder;
     const curIdx = order.indexOf(currentAppraiserId);
     let nextId: string | undefined;
     for (let k = 1; k <= order.length; k++) {
       const candId = order[(curIdx + k) % order.length];
-      if (!round.finishedAppraisers.includes(candId)) { nextId = candId; break; }
+      if (candId !== currentAppraiserId && !round.finishedAppraisers.includes(candId)) { nextId = candId; break; }
     }
     if (nextId) {
       engine.passAppraiseTurn(room, currentAppraiserId, nextId);
     } else {
+      // 没有其他未完成的玩家（自己即末位）：直接结束本轮
       if (!round.finishedAppraisers.includes(currentAppraiserId)) round.finishedAppraisers.push(currentAppraiserId);
       round.currentAppraiserId = undefined;
       engine.enterDiscussPhase(room);
       round.events.push('全员鉴宝完毕，进入发言环节。');
     }
+
   } else if (phase === 'discuss') {
     const round = room.game.rounds[room.game.currentRound - 1];
     const currentId = round.speechOrder[round.currentSpeakerIndex];
