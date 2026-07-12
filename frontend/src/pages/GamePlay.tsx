@@ -603,13 +603,25 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const myAppraisals = game.myAppraisals[g.currentRound] || [];
   const sealedRound = game.sealedRounds.includes(g.currentRound);
   const [turnEnded, setTurnEnded] = useState(false);
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [popupResult, setPopupResult] = useState<any>(null);
 
   const isMyTurn = g.currentAppraiserId === me.id;
 
   // 当不再是当前鉴宝者时，重置状态
   useEffect(() => {
-    if (!isMyTurn) setTurnEnded(false);
+    if (!isMyTurn) { setTurnEnded(false); setPendingId(null); setPopupResult(null); }
   }, [isMyTurn]);
+
+  // 点击鉴宝后，待心跳返回结果时弹出结果弹窗
+  useEffect(() => {
+    if (pendingId === null) return;
+    const res = (game.myAppraisals[g.currentRound] || []).find((r: any) => r.artifactId === pendingId);
+    if (res) {
+      setPopupResult(res);
+      setPendingId(null);
+    }
+  }, [game.myAppraisals, pendingId, g.currentRound]);
 
   if (!roleInfo) return <div className="card-antique p-4">等待角色分配…</div>;
 
@@ -629,6 +641,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
       toast.error('此兽首鉴定结果已被隐藏');
       return;
     }
+    setPendingId(artifactId);
     send({ type: 'appraise', artifactId });
   };
 
@@ -754,6 +767,30 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
           </div>
         </div>
       )}
+
+      {/* 鉴宝结果弹窗 */}
+      {popupResult && (() => {
+        const art = g.artifacts.find((a: any) => a.id === popupResult.artifactId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPopupResult(null)}>
+            <div
+              className="card-antique-glow p-6 w-full max-w-xs text-center animate-seal"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="font-brush text-2xl text-bronze mb-1">鉴定结果</div>
+              <div className="text-ivory mb-4">
+                你鉴定了 <span className="text-gold-glow font-bold">{art?.name}</span>
+              </div>
+              <div className={`text-3xl font-brush mb-5 ${popupResult.appearsReal ? 'text-jade' : 'text-vermilion'}`}>
+                {popupResult.appearsReal ? '看似真品' : '看似赝品'}
+              </div>
+              <Button onClick={() => setPopupResult(null)} className="btn-seal w-full h-11 text-base">
+                确认
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
