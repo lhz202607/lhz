@@ -445,7 +445,10 @@ export function identifyVote(room: Room, playerId: string, targetId: string): { 
 }
 
 export function isIdentifyDone(room: Room): boolean {
-  return room.players.every(p => p.identifyTargetId !== undefined);
+  // 郑国渠不参与终局指认
+  return room.players
+    .filter(p => p.role && p.role !== 'zhengguoqu')
+    .every(p => p.identifyTargetId !== undefined);
 }
 
 export function resolveIdentify(room: Room): void {
@@ -503,6 +506,10 @@ export function resolveIdentify(room: Room): void {
   // 公布每位玩家指认票型
   log.push('—— 指认票型 ——');
   for (const p of room.players) {
+    if (p.role === 'zhengguoqu') {
+      log.push(`VOTE:${p.id}:${p.name}:不参与`);
+      continue;
+    }
     const targetId = game.identifyVotes[p.id];
     const targetName = targetId ? room.players.find(t => t.id === targetId)?.name || '未知' : '未投票';
     log.push(`VOTE:${p.id}:${p.name}:${targetName}`);

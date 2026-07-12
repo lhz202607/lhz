@@ -1,8 +1,8 @@
 {
   "project_type": "web",
   "sub_project_type": "",
-  "name": "古董局中局十二兽首",
-  "app_slug": "antique-game",
-  "version_description": "终局增加每轮鉴宝回顾",
+  "name": "古董局中局兽首",
+  "app_slug": "antique-zodiac-heads",
+  "version_description": "Fix bet reveal edge cases and rule robustness",
   "preview_type": "pc"
 }

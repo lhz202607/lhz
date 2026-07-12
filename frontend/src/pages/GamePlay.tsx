@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { connectGame, disconnectGame, send, useGameState } from '@/lib/game/client';
 import { ROLE_INFO } from '@/lib/game/roles';
+import BackgroundMusic from '@/components/BackgroundMusic';
 import { RoleId } from '@/shared/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +68,7 @@ export default function GamePlay() {
 
   return (
     <div className="min-h-screen bg-antique p-3 lg:p-5">
+      <BackgroundMusic />
       <div className="max-w-7xl mx-auto">
         {/* 顶部状态栏 */}
         <header className="card-antique px-3 py-2 sm:px-4 sm:py-3 mb-3 sm:mb-4 flex items-center justify-between flex-wrap gap-2 sm:gap-3">
@@ -74,7 +76,7 @@ export default function GamePlay() {
             <div className="font-brush text-xl sm:text-2xl text-bronze">古董局中局</div>
             <div className="text-ivory-dim text-[10px] sm:text-xs">房间 {room.code}</div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 pr-10 sm:pr-0">
             <div className="text-center">
               <div className="text-ivory-dim text-[10px] sm:text-xs">轮次</div>
               <div className="text-bronze font-bold text-sm sm:text-base">{g.currentRound} / 3</div>
@@ -1323,7 +1325,11 @@ function IdentifyPanel({ room, game }: { room: any; game: any }) {
 
   const targets = room.players.filter((p: any) => p.id !== me.id);
   const isHost = !!me.isHost;
-  const allVoted = Object.keys(g.identifyVotes || {}).length;
+  const isZhengguoqu = myRole === 'zhengguoqu';
+  // 郑国渠不参与指认，统计已投票人数时排除郑国渠
+  const needVotePlayers = room.players.filter((p: any) => p.role && p.role !== 'zhengguoqu');
+  const allVoted = needVotePlayers.filter((p: any) => g.identifyVotes?.[p.id]).length;
+  const totalNeedVote = needVotePlayers.length;
 
   return (
     <div className="card-antique-glow p-4 sm:p-6 space-y-4">
@@ -1380,7 +1386,11 @@ function IdentifyPanel({ room, game }: { room: any; game: any }) {
         )}
       </div>
 
-      {myVote ? (
+      {isZhengguoqu ? (
+        <div className="text-center text-bronze text-sm py-2">
+          你为局外人，无需参与终局指认，静观其变。
+        </div>
+      ) : myVote ? (
         <div className="text-center text-jade text-sm">
           已指认，等待其他玩家…
         </div>
@@ -1401,12 +1411,12 @@ function IdentifyPanel({ room, game }: { room: any; game: any }) {
 
       <div className="flex items-center gap-2 text-xs text-ivory-dim">
         <div className="flex-1 bg-black/30 rounded-full h-2 overflow-hidden">
-          <div className="h-full bg-bronze" style={{ width: `${(allVoted / room.players.length) * 100}%` }} />
+          <div className="h-full bg-bronze" style={{ width: `${(allVoted / totalNeedVote) * 100}%` }} />
         </div>
-        <span>{allVoted} / {room.players.length} 已投票</span>
+        <span>{allVoted} / {totalNeedVote} 已投票</span>
       </div>
 
-      {isHost && allVoted >= room.players.length && (
+      {isHost && allVoted >= totalNeedVote && totalNeedVote > 0 && (
         <Button onClick={() => send({ type: 'nextRound' })} className="btn-seal w-full h-12 text-lg">
           揭晓结果
         </Button>
