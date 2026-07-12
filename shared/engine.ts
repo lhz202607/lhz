@@ -292,9 +292,9 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
     // 非前置位：本轮立即生效
     rs.sealed = true;
     if (target.role === 'jiyunfu') target.permanentlyDisabled = true;
+    // 立即封方震：不连带许愿（仅当方震为前置位、延迟到下一轮封印时才连带许愿）
     if (target.role === 'fangzhen') {
-      const xuyuan = room.players.find(p => p.role === 'xuyuan');
-      if (xuyuan) { const xrs = room.game.playerRoundStates[xuyuan.id]?.[room.game.currentRound]; if (xrs) xrs.sealed = true; }
+      round.events.push(`药不然封印了${target.name}（后置位），方震本轮被封印，许愿不受影响。`);
     }
   }
   return { ok: true };
