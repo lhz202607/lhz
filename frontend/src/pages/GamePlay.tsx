@@ -350,7 +350,7 @@ function PhaseBadge({ phase }: { phase: string }) {
     ended: { label: '终局', color: 'text-vermilion' },
   };
   const m = map[phase] || map.waiting;
-  return <span className={`font-bold ${m.color}`}>{m.label}</span>;
+  return <span className={`phase-badge ${m.color}`}>{m.label}</span>;
 }
 
 // ============================================================
@@ -365,19 +365,20 @@ function ZodiacBoard({ room, game }: { room: any; game: any }) {
   const isReveal = g.phase === 'reveal' || g.phase === 'ended';
   const me = game.me;
   const myRole = game.myRole;
+  const myTurn = g.phase === 'appraise' && g.currentAppraiserId === me.id;
 
   // 获取当前轮的投票明细
   const currentRoundData = (g.rounds || [])[g.currentRound - 1];
   const playerVotes: Record<string, number[]> = currentRoundData?.playerVotes || {};
 
   return (
-    <div className="card-antique p-4">
+    <div className={`card-antique p-4 ${myTurn ? 'ring-active' : ''}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-bronze font-antique font-bold flex items-center gap-2">
           <Sparkles className="w-4 h-4" /> 十二兽首
         </div>
         <div className="text-ivory-dim text-xs">
-          {isReveal ? '押币结果揭示中' : g.phase === 'vote' ? '选择押币目标' : '点击鉴定真伪'}
+          {isReveal ? '押币结果揭示中' : g.phase === 'vote' ? '选择押币目标' : myTurn ? '轮到你，点击鉴宝' : '点击鉴定真伪'}
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -465,22 +466,19 @@ function ZodiacTileInner({ name, state, betCount, myView, showMyView }: {
 
   return (
     <>
-      <div className="font-brush text-2xl text-bronze mb-0.5">{name[0]}</div>
-      <div className="text-[10px] text-ivory-dim">{name[1]}</div>
-      {state === 'locked' && <Lock className="w-3 h-3 text-vermilion mt-1" />}
+      <div className="zodiac-glyph text-4xl text-bronze">{name[0]}</div>
+      {state === 'locked' && <Lock className="w-3 h-3 text-vermilion absolute bottom-1.5" />}
       {showMyView && (
         <div className={`text-[10px] mt-1 ${myView ? 'text-jade' : 'text-vermilion'}`}>
           {myView ? '似真' : '似假'}
         </div>
       )}
       {betCount !== undefined && betCount > 0 && (
-        <div className="text-[10px] text-gold-glow mt-1 flex items-center gap-0.5">
-          <Coins className="w-2.5 h-2.5" /> {betCount}
-        </div>
+        <div className="count-badge">{betCount}</div>
       )}
-      {state === 'real' && <div className="text-[10px] text-jade mt-1 font-bold">真品</div>}
-      {state === 'fake' && <div className="text-[10px] text-vermilion mt-1 font-bold">赝品</div>}
-      {state === 'hidden' && <div className="text-[10px] text-ivory-dim mt-1">已隐</div>}
+      {state === 'real' && <div className="seal-tag real">真品</div>}
+      {state === 'fake' && <div className="seal-tag fake">赝品</div>}
+      {state === 'hidden' && <div className="seal-tag hidden-tag">已隐匿</div>}
     </>
   );
 }
@@ -503,7 +501,7 @@ function ZodiacTile({ name, state, betCount, myView, showMyView }: {
   }[state];
 
   return (
-    <div className={`zodiac-card ${cls} aspect-[3/4] flex flex-col items-center justify-center p-2`}>
+    <div className={`zodiac-card ${cls} aspect-[3/4] flex flex-col items-center justify-center p-2 overflow-hidden`}>
       <ZodiacTileInner name={name} state={state} betCount={betCount} myView={myView} showMyView={showMyView} />
     </div>
   );
@@ -1105,29 +1103,22 @@ function VotePanel({ room, game }: { room: any; game: any }) {
             <button
               key={a.id}
               onClick={() => send({ type: 'bet', artifactId: a.id })}
-              className={`zodiac-card aspect-[3/4] flex flex-col items-center justify-center p-2 relative ${
+              className={`zodiac-card aspect-[3/4] flex flex-col items-center justify-center p-2 relative overflow-hidden ${
                 isMyBet ? 'selected' : ''
               }`}
               disabled={voteFinished || remainingVotes <= 0}
             >
-              <div className="font-brush text-2xl text-bronze mb-0.5">{a.name[0]}</div>
-              <div className="text-[10px] text-ivory-dim">{a.name[1]}</div>
-              {showCounts && (
-                <div className={`mt-1 flex items-center gap-0.5 text-[11px] font-bold ${
-                  isTopBet ? 'text-gold-glow' : 'text-ivory-dim'
-                }`}>
-                  <Coins className="w-3 h-3" />{count}
-                </div>
-              )}
+              <div className="zodiac-glyph text-4xl text-bronze">{a.name[0]}</div>
+              {showCounts && count > 0 && <div className="count-badge"><Coins className="w-2.5 h-2.5 mr-0.5" />{count}</div>}
               {showCounts && count > 0 && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30 rounded-b overflow-hidden">
+                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/30">
                   <div className={`h-full ${isTopBet ? 'bg-gold-glow' : 'bg-bronze'}`}
                     style={{ width: `${(count / maxBet) * 100}%` }} />
                 </div>
               )}
               {isMyBet && (
-                <div className="absolute top-1 right-1 text-[9px] text-gold-glow font-bold bg-black/50 rounded px-1">
-                  {myBetCount > 1 ? `x${myBetCount}` : '我'}
+                <div className="absolute top-1 left-1 text-[9px] text-gold-glow font-bold bg-black/60 rounded px-1.5 py-0.5 flex items-center gap-0.5">
+                  <Coins className="w-2.5 h-2.5" />{myBetCount > 1 ? `x${myBetCount}` : '已投'}
                 </div>
               )}
             </button>

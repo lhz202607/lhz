@@ -652,3 +652,90 @@ body {
 ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
 ::-webkit-scrollbar-thumb { background: rgba(201,169,97,0.3); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(201,169,97,0.5); }
+
+/* ================================================================
+   体验增强（UI 美化 / 易用性）
+   ================================================================ */
+
+/* 圆角统一增强 */
+.card-antique, .card-antique-glow { border-radius: 14px; }
+
+/* 面板 hover 轻微浮起 */
+.card-antique, .card-antique-glow { transition: box-shadow 0.3s ease, transform 0.3s ease; }
+.card-antique:hover, .card-antique-glow:hover { box-shadow: 0 6px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(201,169,97,0.12); }
+
+/* 当前行动者 / 当前阶段 高亮环 */
+.ring-active {
+  box-shadow: 0 0 0 2px var(--gold-glow), 0 0 20px rgba(212,175,55,0.35) !important;
+  border-color: var(--gold-glow) !important;
+}
+
+/* 兽首大字书法呈现 */
+.zodiac-glyph {
+  font-family: var(--font-brush);
+  line-height: 1;
+}
+
+/* 真假印章标签 */
+.seal-tag {
+  position: absolute;
+  top: 6px; left: 50%;
+  transform: translateX(-50%) rotate(-4deg);
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-family: var(--font-antique);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  border: 1.5px solid;
+}
+.seal-tag.real { color: var(--jade); border-color: var(--jade); background: rgba(107,142,127,0.12); }
+.seal-tag.fake { color: var(--vermilion); border-color: var(--vermilion); background: rgba(176,64,64,0.12); }
+.seal-tag.hidden-tag { color: var(--ivory-dim); border-color: var(--ivory-dim); background: rgba(168,152,120,0.1); }
+
+/* 押币数 / 票数 徽章（右上角） */
+.count-badge {
+  position: absolute;
+  top: 6px; right: 6px;
+  min-width: 20px; height: 20px;
+  padding: 0 5px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #d4af37, #a08840);
+  color: #1a1612;
+  font-size: 11px; font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+/* 玩家阵营色环（好=玉绿，坏=朱砂） */
+.token-xuyuan { box-shadow: 0 0 0 2px var(--jade), 0 0 10px rgba(107,142,127,0.4); }
+.token-laochaofeng { box-shadow: 0 0 0 2px var(--vermilion), 0 0 10px rgba(176,64,64,0.4); }
+
+/* 状态徽章（提示用） */
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  border: 1px solid rgba(201,169,97,0.3);
+  background: rgba(201,169,97,0.08);
+  color: var(--ivory-dim);
+}
+.pill-danger { border-color: rgba(176,64,64,0.4); background: rgba(176,64,64,0.12); color: var(--vermilion); }
+.pill-ok { border-color: rgba(107,142,127,0.4); background: rgba(107,142,127,0.12); color: var(--jade); }
+
+/* 阶段徽章（顶栏） */
+.phase-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700;
+  border: 1px solid currentColor;
+}
+
+/* 通用按压反馈 */
+.btn-seal:active:not(:disabled), .btn-bronze:active:not(:disabled), .btn-ghost:active:not(:disabled) { transform: translateY(1px) scale(0.98); }
+
+/* 移动端兽首卡片更紧凑 */
+@media (max-width: 640px) {
+  .zodiac-card { border-radius: 8px; }
+}
+
