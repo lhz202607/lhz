@@ -623,6 +623,12 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
 
   const handleAppraise = (artifactId: number) => {
     if (remaining <= 0) { toast.error('本轮鉴宝次数已用完'); return; }
+    // 非郑国渠尝试鉴定被隐藏的兽首
+    const art = g.artifacts.find((a: any) => a.id === artifactId);
+    if (art?.locked && roleInfo.id !== 'zhengguoqu') {
+      toast.error('此兽首鉴定结果已被隐藏');
+      return;
+    }
     send({ type: 'appraise', artifactId });
   };
 
@@ -671,17 +677,19 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
             {g.artifacts.map((a: any) => {
               const appraised = myAppraisals.some((r: any) => r.artifactId === a.id);
+              // 只有郑国渠本人能看到被锁定的兽首
+              const isLockedVisible = a.locked && roleInfo.id === 'zhengguoqu';
               return (
                 <button
                   key={a.id}
                   onClick={() => handleAppraise(a.id)}
-                  disabled={appraised || a.locked}
+                  disabled={appraised || isLockedVisible}
                   className={`zodiac-card aspect-square flex items-center justify-center p-1 ${
-                    appraised || a.locked ? 'disabled' : ''
+                    appraised || isLockedVisible ? 'disabled' : ''
                   }`}
                 >
                   <span className="font-brush text-lg text-bronze">{a.name[0]}</span>
-                  {a.locked && <Lock className="w-3 h-3 text-vermilion absolute top-1 right-1" />}
+                  {isLockedVisible && <Lock className="w-3 h-3 text-vermilion absolute top-1 right-1" />}
                 </button>
               );
             })}
@@ -1060,8 +1068,8 @@ function VotePanel({ room, game }: { room: any; game: any }) {
               onClick={() => send({ type: 'bet', artifactId: a.id })}
               className={`zodiac-card aspect-[3/4] flex flex-col items-center justify-center p-2 relative ${
                 isMyBet ? 'selected' : ''
-              } ${a.locked ? 'locked' : ''}`}
-              disabled={a.locked || voteFinished || remainingVotes <= 0}
+              }`}
+              disabled={voteFinished || remainingVotes <= 0}
             >
               <div className="font-brush text-2xl text-bronze mb-0.5">{a.name[0]}</div>
               <div className="text-[10px] text-ivory-dim">{a.name[1]}</div>

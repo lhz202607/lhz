@@ -200,7 +200,7 @@ export function appraise(room: Room, playerId: string, artifactId: number): Appr
   if (!check.can) return { error: check.reason || '无法鉴宝' };
   const artifact = round.artifacts.find(a => a.id === artifactId);
   if (!artifact) return { error: '兽首不存在' };
-  if (round.lockedArtifactId === artifactId) return { error: '该兽首已被封存' };
+  if (round.lockedArtifactId === artifactId) return { error: '此兽首鉴定结果已被隐藏' };
   const rs = room.game.playerRoundStates[playerId][room.game.currentRound];
   let appearsReal = artifact.isReal;
   const role = ROLES[player.role!];

@@ -107,7 +107,11 @@ class RoomManager {
 
     if (round) {
       flipUsedThisRound = round.laochaofengUsedFlip;
-      artifacts = round.artifacts.map(a => ({ id: a.id, name: a.name, locked: round.lockedArtifactId === a.id }));
+      artifacts = round.artifacts.map(a => ({
+        id: a.id, name: a.name,
+        // 兽首锁定状态仅郑国渠本人可见
+        locked: viewerId ? room.players.find(p => p.id === viewerId)?.role === 'zhengguoqu' && round.lockedArtifactId === a.id : false,
+      }));
       speechOrder = round.speechOrder;
       currentSpeakerIndex = round.currentSpeakerIndex;
       events = round.events;

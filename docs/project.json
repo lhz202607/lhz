@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局十二兽首",
   "app_slug": "antique-game",
-  "version_description": "修复黄烟烟随机跳过轮次前端提示",
+  "version_description": "郑国渠隐藏兽首仅本人可见鉴定提示",
   "preview_type": "pc"
 }
