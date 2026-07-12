@@ -660,6 +660,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const roleInfo = myRole ? ROLE_INFO[myRole as any] : null;
   const myAppraisals = game.myAppraisals[g.currentRound] || [];
   const sealedRound = game.sealedRounds.includes(g.currentRound);
+  const fangzhenPenalty = !!(game.fangzhenSealPenaltyRounds || []).includes(g.currentRound);
   const myRS = game.playerRoundStates?.[me.id]?.[g.currentRound];
   const randomlyBlockedRound = !!(myRS && myRS.randomlyBlocked && !myRS.sealed);
   const [turnEnded, setTurnEnded] = useState(false);
@@ -685,7 +686,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
 
   if (!roleInfo) return <div className="card-antique p-4">等待角色分配…</div>;
 
-  const canAppraise = roleInfo.appraiseCount > 0 && !sealedRound;
+  const canAppraise = roleInfo.appraiseCount > 0 && !sealedRound && !fangzhenPenalty;
   const appraisedCount = game.myAppraisals[g.currentRound]?.length || 0;
   const remaining = roleInfo.appraiseCount - appraisedCount;
   const finishedAppraisers = g.finishedAppraisers || [];
@@ -728,16 +729,19 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
           </div>
         ) : (
           <div className="text-sm text-vermilion">
-            {sealedRound ? (randomlyBlockedRound ? '本轮心神不宁' : '本轮已被封印') : roleInfo.appraiseCount === 0 ? '本角色不擅鉴宝' : '无法鉴宝'}
+            {sealedRound ? (randomlyBlockedRound ? '本轮心神不宁' : '本轮已被封印')
+              : fangzhenPenalty ? '同伴被封印，丧失鉴宝能力'
+                : roleInfo.appraiseCount === 0 ? '本角色不擅鉴宝' : '无法鉴宝'}
           </div>
         )}
-      </div>
 
       {/* 当前鉴宝者提示 */}
       {isMyTurn && (
-        sealedRound ? (
+        (sealedRound || fangzhenPenalty) ? (
           <div className="bg-vermilion/10 border border-vermilion/30 rounded-md px-3 py-2 text-vermilion text-sm font-bold text-center">
-            {randomlyBlockedRound ? '轮到你，但本轮心神不宁，无法鉴宝' : '轮到你，但本轮已被封印'}
+            {sealedRound
+              ? (randomlyBlockedRound ? '轮到你，但本轮心神不宁，无法鉴宝' : '轮到你，但本轮已被封印')
+              : '轮到你，但同伴被封印，你本轮丧失鉴宝能力'}
           </div>
         ) : (
           <div className="bg-gold-glow/10 border border-gold-glow/30 rounded-md px-3 py-2 text-gold-glow text-sm font-bold text-center">
@@ -752,7 +756,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
       )}
 
       {/* 技能操作区（回合结束前可见，封印/心神不宁时不可用） */}
-      {isMyTurn && !turnEnded && !sealedRound && <SkillPanel room={room} game={game} />}
+      {isMyTurn && !turnEnded && !sealedRound && !fangzhenPenalty && <SkillPanel room={room} game={game} />}
 
       {/* 兽首选择鉴宝（回合结束前可见） */}
       {isMyTurn && !turnEnded && canAppraise && remaining > 0 && (
@@ -809,6 +813,8 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
                   ? (randomlyBlockedRound
                       ? '你本轮心神不宁，无法鉴宝或发动技能，请指定下一位玩家。'
                       : '你被药不然封印，本回合无法鉴宝或发动技能，请指定下一位玩家。')
+                  : fangzhenPenalty
+                  ? '你的同伴被封印，你本轮丧失鉴宝能力，请指定下一位玩家。'
                   : roleInfo.appraiseCount === 0
                   ? '你的角色不擅鉴宝，请指定下一位玩家。'
                   : '你的鉴宝次数已用完，请指定下一位玩家。'}

@@ -196,11 +196,11 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
     if (game.pendingSeals[p.id] === roundNumber) {
       sealed = true;
       delete game.pendingSeals[p.id];
-      // 若被延迟封印的是方震，下一轮许愿同时被连带封印
+      // 若被延迟封印的是方震，下一轮许愿同时丧失鉴宝能力（连带效果，不显示被直接封印）
       if (p.role === 'fangzhen') {
         const xuyuan = room.players.find(x => x.role === 'xuyuan');
         if (xuyuan && game.playerRoundStates[xuyuan.id]?.[roundNumber]) {
-          game.playerRoundStates[xuyuan.id][roundNumber].sealed = true;
+          game.playerRoundStates[xuyuan.id][roundNumber].fangzhenSealPenalty = true;
         }
       }
     }
@@ -221,6 +221,7 @@ export function canAppraise(room: Room, playerId: string): { can: boolean; reaso
   // "轮到自己"手动结束回合，而不能被当作"角色无法鉴宝"而自动跳过。
   if (rs.sealed) return { can: false, reason: '本轮已被封印', count: 0 };
   if (rs.randomlyBlocked) return { can: false, reason: '本轮心神不宁', count: 0 };
+  if (rs.fangzhenSealPenalty) return { can: false, reason: '同伴被封印而丧失鉴宝能力', count: 0 };
   if (role.appraiseCount === 0) return { can: false, reason: '该角色无法鉴宝', count: 0 };
   const done = rs.appraisals.length;
   const remaining = role.appraiseCount - done;
@@ -342,6 +343,14 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
     // 非前置位：本轮立即生效
     rs.sealed = true;
     if (target.role === 'jiyunfu') target.permanentlyDisabled = true;
+    // 方震（预言家）被封印：连带使许愿本轮丧失鉴宝能力
+    if (target.role === 'fangzhen') {
+      const xuyuan = room.players.find(x => x.role === 'xuyuan');
+      if (xuyuan) {
+        const xrs = room.game.playerRoundStates[xuyuan.id]?.[room.game.currentRound];
+        if (xrs) xrs.fangzhenSealPenalty = true;
+      }
+    }
     // 机密信息：仅药不然本人可见（不向其他玩家及老朝奉泄露偷袭目标）
     round.secretEvents = round.secretEvents || [];
     round.secretEvents.push(`你偷袭了${target.name}（后置位），其本轮被封印，下位行动受限。`);

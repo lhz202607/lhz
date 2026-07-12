@@ -120,6 +120,8 @@ export interface AppraisalResult {
 export interface PlayerRoundState {
   sealed: boolean;
   randomlyBlocked: boolean;
+  /** 许愿专属：因方震（预言家）被封印，连带丧失本轮鉴宝能力 */
+  fangzhenSealPenalty?: boolean;
   appraisals: AppraisalResult[];
 }
 

@@ -14,6 +14,7 @@ interface GameState {
   myAppraisals: any;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
+  fangzhenSealPenaltyRounds: number[];
   knownAllies: { playerId: string; playerName: string; roleId: RoleId }[];
   remainingVotes: number;
   error: string | null;
@@ -22,7 +23,7 @@ interface GameState {
 
 let state: GameState = {
   room: null, me: null, myRole: null, myAppraisals: {},
-  fangzhenResults: [], sealedRounds: [], knownAllies: [], remainingVotes: 0,
+  fangzhenResults: [], sealedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
   error: null, connected: false,
 };
 
@@ -43,6 +44,7 @@ interface HeartbeatResponse {
   myAppraisals: Record<number, AppraisalResult[]>;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
+  fangzhenSealPenaltyRounds?: number[];
   knownAllies?: { playerId: string; playerName: string; roleId: RoleId }[];
   remainingVotes?: number;
 }
@@ -55,6 +57,7 @@ function applyHeartbeat(data: HeartbeatResponse): void {
     myAppraisals: data.myAppraisals,
     fangzhenResults: data.fangzhenResults,
     sealedRounds: data.sealedRounds,
+    fangzhenSealPenaltyRounds: data.fangzhenSealPenaltyRounds || [],
     knownAllies: data.knownAllies || [],
     remainingVotes: data.remainingVotes || 0,
     connected: true, error: null,
@@ -93,7 +96,7 @@ export async function connectGame(code: string, name: string, pid?: string): Pro
   roomCode = code.toUpperCase();
   setState({
     room: null, me: null, myRole: null, myAppraisals: {},
-    fangzhenResults: [], sealedRounds: [], knownAllies: [], remainingVotes: 0,
+    fangzhenResults: [], sealedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
     error: null, connected: false,
   });
   emit();
@@ -155,7 +158,7 @@ export function disconnectGame(): void {
   playerId = null; roomCode = null;
   state = {
     room: null, me: null, myRole: null, myAppraisals: [],
-    fangzhenResults: [], sealedRounds: [], knownAllies: [], remainingVotes: 0,
+    fangzhenResults: [], sealedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
     error: null, connected: false,
   };
   emit();
