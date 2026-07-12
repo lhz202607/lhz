@@ -634,6 +634,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const appraiseDone = !canAppraise || remaining <= 0;
 
   const handleAppraise = (artifactId: number) => {
+    if (sealedRound) { toast.error('你被药不然封印，本轮无法鉴宝'); return; }
     if (remaining <= 0) { toast.error('本轮鉴宝次数已用完'); return; }
     // 非郑国渠尝试鉴定被隐藏的兽首
     const art = g.artifacts.find((a: any) => a.id === artifactId);

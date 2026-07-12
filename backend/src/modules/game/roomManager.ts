@@ -83,8 +83,8 @@ class RoomManager {
 
     const players: PublicPlayer[] = room.players.map(p => {
       const rs = room.game.playerRoundStates[p.id]?.[room.game.currentRound];
-      // 封印可见性：只有药不然本人和被封印者可见
-      const isSealedViewer = viewerId === p.id || (viewerId && room.players.find(pl => pl.id === viewerId)?.role === 'yaoburan');
+      // 封印可见性：仅施法者药不然可见；被封者本人只有轮到鉴宝时才知晓（不在列表中提前暴露）
+      const isSealedViewer = viewerId ? room.players.find(pl => pl.id === viewerId)?.role === 'yaoburan' : false;
       return {
         id: p.id, name: p.name, isHost: p.isHost, isAI: p.isAI, connected: p.connected,
         hasSpoken: p.hasSpoken,
