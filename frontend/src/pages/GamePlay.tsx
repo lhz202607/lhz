@@ -840,9 +840,15 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
               : '轮到你，但你本轮丧失鉴宝能力'}
           </div>
         ) : (
-          <div className="bg-gold-glow/10 border border-gold-glow/30 rounded-md px-3 py-2 text-gold-glow text-sm font-bold text-center">
-            轮到你鉴宝
-          </div>
+          canAppraise ? (
+            <div className="bg-gold-glow/10 border border-gold-glow/30 rounded-md px-3 py-2 text-gold-glow text-sm font-bold text-center">
+              轮到你鉴宝
+            </div>
+          ) : (
+            <div className="bg-gold-glow/10 border border-gold-glow/30 rounded-md px-3 py-2 text-gold-glow text-sm font-bold text-center">
+              轮到你行动，请发动技能后结束回合
+            </div>
+          )
         )
       )}
       {!isMyTurn && g.currentAppraiserId && (

@@ -228,7 +228,7 @@ export function canAppraise(room: Room, playerId: string): { can: boolean; reaso
   if (rs.sealed) return { can: false, reason: '本轮已被封印', count: 0 };
   if (rs.randomlyBlocked) return { can: false, reason: '本轮心神不宁', count: 0 };
   if (rs.fangzhenSealPenalty) return { can: false, reason: '你本轮丧失鉴宝能力', count: 0 };
-  if (role.appraiseCount === 0) return { can: false, reason: '该角色无法鉴宝', count: 0 };
+  if (role.appraiseCount === 0) return { can: false, reason: '本角色不鉴宝', count: 0 };
   const done = rs.appraisals.length;
   const remaining = role.appraiseCount - done;
   if (remaining <= 0) return { can: false, reason: '次数已用完', count: 0 };
@@ -267,8 +267,10 @@ export function passAppraiseTurn(room: Room, playerId: string, nextPlayerId: str
   if (!nextPlayer) return { ok: false, error: '目标玩家不存在' };
   if (!round.finishedAppraisers.includes(playerId)) round.finishedAppraisers.push(playerId);
   const nextCheck = canAppraise(room, nextPlayerId);
-  // 被封印或随机无法鉴宝的玩家仍需"轮到自己"，手动点击结束回合（不自动跳过）
-  if (!nextCheck.can && (nextCheck.reason === '本轮已被封印' || nextCheck.reason === '本轮心神不宁')) {
+  // 以下情况仍需"轮到自己"，手动点击结束回合（不自动跳过）：
+  // - 被封印 / 心神不宁
+  // - 本角色不鉴宝（如方震），但仍有主动技能（验人）需在自己回合发动
+  if (!nextCheck.can && (nextCheck.reason === '本轮已被封印' || nextCheck.reason === '本轮心神不宁' || nextCheck.reason === '本角色不鉴宝')) {
     round.currentAppraiserId = nextPlayerId;
     pushActual(round, nextPlayerId);
     return { ok: true };
