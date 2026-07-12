@@ -387,6 +387,101 @@ export default function GamePlay() {
         <RoleRevealModal roleInfo={roleInfo} knownAllies={knownAllies} onClose={() => setShowRoleCard(false)} />
       )}
 
+      {/* 我的历史行动弹窗 */}
+      {showHistory && (() => {
+        const g = room.game;
+        const rounds = [1, 2, 3].filter(r => (game.myAppraisals?.[r]?.length || 0) > 0 || r <= g.currentRound);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowHistory(false)}>
+            <div
+              className="card-antique p-5 w-full max-w-sm max-h-[80vh] overflow-y-auto animate-seal"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-brush text-xl text-bronze flex items-center gap-1">
+                  <History className="w-4 h-4" /> 我的历史行动
+                </div>
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="text-ivory-dim hover:text-bronze text-sm border border-bronze/30 rounded px-2 py-0.5"
+                >关闭</button>
+              </div>
+
+              {rounds.length === 0 && (
+                <div className="text-ivory-dim text-sm">尚未有行动记录。</div>
+              )}
+
+              {rounds.map(r => {
+                const apps: any[] = game.myAppraisals?.[r] || [];
+                const fz = (myRole === 'fangzhen') ? game.fangzhenResults.find((x: any) => x.round === r) : null;
+                const isCurrent = r === g.currentRound;
+                return (
+                  <div key={r} className="mb-3 last:mb-0 border border-bronze/20 rounded-md p-2.5 bg-black/20">
+                    <div className="text-gold-glow text-xs font-bold mb-1.5">
+                      第{r}轮{isCurrent ? ' · 当前' : ''}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-ivory-dim">鉴宝结果：</div>
+                      {apps.length > 0 ? apps.map((a: any, i: number) => {
+                        const art = g.artifacts.find((x: any) => x.id === a.artifactId);
+                        return (
+                          <div key={i} className="text-xs bg-black/30 px-2 py-1 rounded flex justify-between">
+                            <span className="text-ivory">{art?.name || '兽首'}</span>
+                            <span className={a.appearsReal ? 'text-jade' : 'text-vermilion'}>
+                              {a.appearsReal ? '看似真品' : '看似赝品'}
+                            </span>
+                          </div>
+                        );
+                      }) : (
+                        <div className="text-[11px] text-ivory-dim/70">（本轮未鉴宝或未行动）</div>
+                      )}
+                    </div>
+
+                    {/* 技能发动情况 */}
+                    <div className="mt-2 space-y-1">
+                      <div className="text-[11px] text-ivory-dim">技能发动：</div>
+                      {myRole === 'fangzhen' && fz && (
+                        <div className="text-xs bg-black/30 px-2 py-1 rounded">
+                          查验 <span className="text-ivory">{fz.targetName}</span>：
+                          <span className={fz.faction === 'xuyuan' ? 'text-jade' : 'text-vermilion'}>
+                            {fz.faction === 'xuyuan' ? ' 好人' : ' 坏人'}
+                          </span>
+                        </div>
+                      )}
+                      {r === g.currentRound && (
+                        <>
+                          {myRole === 'yaoburan' && (me as any).yaoburanSealTarget && (
+                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
+                              封印之术：已偷袭一名玩家
+                            </div>
+                          )}
+                          {myRole === 'zhengguoqu' && (me as any).zhengguoquLockedArtifact != null && (
+                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
+                              封存兽首：本轮已封锁一只兽首
+                            </div>
+                          )}
+                          {myRole === 'laochaofeng' && (me as any).laochaofengUsedFlip && (
+                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
+                              颠倒乾坤：本轮已施展
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {myRole === 'fangzhen' && !fz && (
+                        <div className="text-[11px] text-ivory-dim/70">（本轮未发动查验）</div>
+                      )}
+                      {myRole && (['xuyuan','huangyanyan','muhujianai','jiyunfu'].includes(myRole)) && (
+                        <div className="text-[11px] text-ivory-dim/70">（无主动技能）</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {game.error && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-vermilion/90 text-ivory px-4 py-2 rounded-md text-sm animate-float-in z-50">
           {game.error}
@@ -734,6 +829,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
                 : roleInfo.appraiseCount === 0 ? '本角色不擅鉴宝' : '无法鉴宝'}
           </div>
         )}
+      </div>
 
       {/* 当前鉴宝者提示 */}
       {isMyTurn && (
@@ -885,100 +981,6 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
               <Button onClick={() => setPopupResult(null)} className="btn-seal w-full h-11 text-base">
                 确认
               </Button>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* 我的历史行动弹窗 */}
-      {showHistory && (() => {
-        const rounds = [1, 2, 3].filter(r => (game.myAppraisals?.[r]?.length || 0) > 0 || r <= g.currentRound);
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowHistory(false)}>
-            <div
-              className="card-antique p-5 w-full max-w-sm max-h-[80vh] overflow-y-auto animate-seal"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="font-brush text-xl text-bronze flex items-center gap-1">
-                  <History className="w-4 h-4" /> 我的历史行动
-                </div>
-                <button
-                  onClick={() => setShowHistory(false)}
-                  className="text-ivory-dim hover:text-bronze text-sm border border-bronze/30 rounded px-2 py-0.5"
-                >关闭</button>
-              </div>
-
-              {rounds.length === 0 && (
-                <div className="text-ivory-dim text-sm">尚未有行动记录。</div>
-              )}
-
-              {rounds.map(r => {
-                const apps: any[] = game.myAppraisals?.[r] || [];
-                const fz = (myRole === 'fangzhen') ? game.fangzhenResults.find((x: any) => x.round === r) : null;
-                const isCurrent = r === g.currentRound;
-                return (
-                  <div key={r} className="mb-3 last:mb-0 border border-bronze/20 rounded-md p-2.5 bg-black/20">
-                    <div className="text-gold-glow text-xs font-bold mb-1.5">
-                      第{r}轮{isCurrent ? ' · 当前' : ''}
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-[11px] text-ivory-dim">鉴宝结果：</div>
-                      {apps.length > 0 ? apps.map((a: any, i: number) => {
-                        const art = g.artifacts.find((x: any) => x.id === a.artifactId);
-                        return (
-                          <div key={i} className="text-xs bg-black/30 px-2 py-1 rounded flex justify-between">
-                            <span className="text-ivory">{art?.name || '兽首'}</span>
-                            <span className={a.appearsReal ? 'text-jade' : 'text-vermilion'}>
-                              {a.appearsReal ? '看似真品' : '看似赝品'}
-                            </span>
-                          </div>
-                        );
-                      }) : (
-                        <div className="text-[11px] text-ivory-dim/70">（本轮未鉴宝或未行动）</div>
-                      )}
-                    </div>
-
-                    {/* 技能发动情况 */}
-                    <div className="mt-2 space-y-1">
-                      <div className="text-[11px] text-ivory-dim">技能发动：</div>
-                      {myRole === 'fangzhen' && fz && (
-                        <div className="text-xs bg-black/30 px-2 py-1 rounded">
-                          查验 <span className="text-ivory">{fz.targetName}</span>：
-                          <span className={fz.faction === 'xuyuan' ? 'text-jade' : 'text-vermilion'}>
-                            {fz.faction === 'xuyuan' ? ' 好人' : ' 坏人'}
-                          </span>
-                        </div>
-                      )}
-                      {r === g.currentRound && (
-                        <>
-                          {myRole === 'yaoburan' && me.yaoburanSealTarget && (
-                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
-                              封印之术：已偷袭一名玩家
-                            </div>
-                          )}
-                          {myRole === 'zhengguoqu' && me.zhengguoquLockedArtifact != null && (
-                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
-                              封存兽首：本轮已封锁一只兽首
-                            </div>
-                          )}
-                          {myRole === 'laochaofeng' && me.laochaofengUsedFlip && (
-                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
-                              颠倒乾坤：本轮已施展
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {myRole === 'fangzhen' && !fz && (
-                        <div className="text-[11px] text-ivory-dim/70">（本轮未发动查验）</div>
-                      )}
-                      {(['xuyuan','huangyanyan','muhujianai','jiyunfu'].includes(myRole)) && (
-                        <div className="text-[11px] text-ivory-dim/70">（无主动技能）</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         );

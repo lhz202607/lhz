@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Defer random block when sealed overlaps",
+  "version_description": "Fix build JSX structure history modal",
   "preview_type": "pc"
 }
