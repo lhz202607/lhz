@@ -13,6 +13,13 @@ function setupRoom() {
   assignRoles(room)
   room.players.forEach((p, i) => { (p as any).role = roles[i] })
   room.game.playerRoundStates = {}
+  // 重置并正确设置木户加奈/黄烟烟的跳过轮次
+  room.game.skipRoundsMap = {};
+  room.players.forEach(p => {
+    if (p.role === 'huangyanyan' || p.role === 'muhujianai') {
+      room.game.skipRoundsMap[p.id] = 1 + Math.floor(Math.random() * 3);
+    }
+  });
   const artifacts = generateAllArtifacts()
   return { room, artifacts }
 }

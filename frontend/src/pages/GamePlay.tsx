@@ -304,11 +304,6 @@ export default function GamePlay() {
                         </div>
                       );
                     })}
-                    {g.flipUsedThisRound && roleInfo.faction === 'xuyuan' && roleInfo.id !== 'jiyunfu' && (
-                      <div className="text-[10px] text-vermilion mt-1 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> 本轮鉴定结果或有颠倒，真假难辨！
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -471,6 +466,9 @@ export default function GamePlay() {
                         <div className="text-[11px] text-ivory-dim/70">（无主动技能）</div>
                       )}
                     </div>
+
+                    {/* 投票详情（每轮） */}
+                    <VoteDetail roundNum={r} room={room} game={game} />
                   </div>
                 );
               })}
@@ -655,6 +653,47 @@ function ZodiacTile({ name, state, betCount, myView, showMyView }: {
   return (
     <div className={`zodiac-card ${cls} aspect-[3/4] flex flex-col items-center justify-center p-2 overflow-hidden`}>
       <ZodiacTileInner name={name} state={state} betCount={betCount} myView={myView} showMyView={showMyView} />
+    </div>
+  );
+}
+
+// ============================================================
+// 投票详情（用于历史弹窗每轮投票记录）
+// ============================================================
+function VoteDetail({ roundNum, room, game }: { roundNum: number; room: any; game: any }) {
+  const [open, setOpen] = useState(false);
+  const g = room.game;
+  const rd = (g.rounds || [])[roundNum - 1];
+  const votes = rd?.playerVotes;
+  const hasVotes = votes && Object.keys(votes).some((pid: string) => (votes[pid]?.length || 0) > 0);
+  if (!hasVotes) return null;
+  // 按兽首分组：哪些人投了哪个兽首
+  const zodiacNames: Record<number, string> = { 1:'鼠首',2:'牛首',3:'虎首',4:'兔首',5:'龙首',6:'蛇首',7:'马首',8:'羊首',9:'猴首',10:'鸡首',11:'狗首',12:'猪首' };
+  const artVotes: Record<number, { name: string; voterIds: string[] }> = {};
+  for (const [pid, ids] of Object.entries(votes)) {
+    for (const id of (ids as number[])) {
+      if (!artVotes[id]) {
+        artVotes[id] = { name: zodiacNames[id] || ('兽首#' + id), voterIds: [] };
+      }
+      const p = room.players.find((x: any) => x.id === pid);
+      if (p) artVotes[id].voterIds.push(p.name);
+    }
+  }
+  return (
+    <div className="mt-2">
+      <button onClick={() => setOpen(!open)} className="text-[10px] text-bronze hover:text-gold-glow flex items-center gap-1">
+        {open ? '收起投票详情 ▲' : '查看投票详情 ▼'}
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1">
+          {Object.entries(artVotes).map(([artId, info]) => (
+            <div key={artId} className="text-[10px] bg-black/30 px-2 py-1 rounded flex items-center justify-between">
+              <span className="text-ivory">{info.name}</span>
+              <span className="text-ivory-dim">{info.voterIds.join('、')}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1361,7 +1400,15 @@ function VotePanel({ room, game }: { room: any; game: any }) {
 
       {/* 结束投票按钮 */}
       {!voteFinished && (
-        <div className="pt-2 border-t border-bronze/20">
+        <div className="pt-2 border-t border-bronze/20 space-y-2">
+          {myBets.length > 0 && (
+            <Button
+              onClick={() => send({ type: 'undoBet' })}
+              className="btn-ghost w-full h-9 text-xs"
+            >
+              撤销上一次投票
+            </Button>
+          )}
           <Button
             onClick={() => send({ type: 'finishVote' })}
             className="btn-bronze w-full h-10"
@@ -1856,6 +1903,22 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
                           {hiddenIsReal ? '真' : '假'}
                         </span>
                       </span>
+                    </div>
+                  )}
+                  {/* 实际行动顺序 */}
+                  {rd.actualOrder && rd.actualOrder.length > 0 && (
+                    <div className="mt-2 pt-1.5 border-t border-bronze/20">
+                      <div className="text-[10px] text-ivory-dim mb-1">实际行动顺序</div>
+                      <div className="flex flex-wrap gap-1">
+                        {rd.actualOrder.map((pid: string, idx: number) => {
+                          const p = room.players.find((x: any) => x.id === pid);
+                          return (
+                            <span key={pid} className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded text-ivory-dim">
+                              {idx + 1}.{p?.name || '?'}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

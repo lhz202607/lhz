@@ -450,6 +450,20 @@ export function playerBet(room: Room, playerId: string, artifactId: number): { o
   return { ok: true };
 }
 
+/** 玩家撤销上一次押币 */
+export function playerUndoBet(room: Room, playerId: string): { ok: boolean; error?: string } {
+  const round = room.game.rounds[room.game.currentRound - 1];
+  if (!round || round.phase !== 'vote') return { ok: false, error: '当前非押币阶段' };
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return { ok: false, error: '玩家不存在' };
+  if (player.finishedVote) return { ok: false, error: '已结束投票，无法撤销' };
+  if (player.betArtifactIds.length === 0) return { ok: false, error: '无可撤销的投票' };
+  const lastId = player.betArtifactIds.pop()!;
+  player.remainingVotes++;
+  round.betCounts[lastId] = Math.max(0, (round.betCounts[lastId] || 1) - 1);
+  return { ok: true };
+}
+
 /** 玩家手动结束投票（未用完的票顺延至下一轮） */
 export function finishVoteForPlayer(room: Room, playerId: string): { ok: boolean; error?: string } {
   const player = room.players.find(p => p.id === playerId);

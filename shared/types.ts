@@ -231,6 +231,7 @@ export type ClientMessage =
   | { type: 'passAppraiseTurn'; nextPlayerId: string }
   | { type: 'speech'; content: string }
   | { type: 'bet'; artifactId: number }
+  | { type: 'undoBet' }  // 撤销上一次押币
   | { type: 'finishVote' }  // 玩家结束投票
   | { type: 'nextRound' }
   | { type: 'identifyVote'; targetId: string }  // 鉴人环节投票

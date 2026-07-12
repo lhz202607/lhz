@@ -15,6 +15,13 @@ function setupRoom() {
   assignRoles(room)
   room.players.forEach((p, i) => { (p as any).role = roles[i] })
   room.game.playerRoundStates = {}
+  // 重置 skipRoundsMap 避免 assignRoles 遗留的随机轮次污染
+  room.game.skipRoundsMap = {};
+  room.players.forEach(p => {
+    if (p.role === 'huangyanyan' || p.role === 'muhujianai') {
+      room.game.skipRoundsMap[p.id] = 1 + Math.floor(Math.random() * 3);
+    }
+  });
   const all = new Set<number>()
   const artifacts = generateAllArtifacts()
   startRound(room, 1, artifacts, all)

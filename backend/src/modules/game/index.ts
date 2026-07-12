@@ -249,6 +249,11 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
         if (!r.ok) error = r.error!;
         break;
       }
+      case 'undoBet': {
+        const r = engine.playerUndoBet(room, playerId);
+        if (!r.ok) error = r.error!;
+        break;
+      }
       case 'finishVote': {
         if (room.game.phase !== 'vote') { error = '当前非押币阶段'; break; }
         const r = engine.finishVoteForPlayer(room, playerId);
