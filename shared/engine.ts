@@ -400,12 +400,12 @@ export function resolveBets(room: Room): void {
   round.phase = 'reveal';
   room.game.phase = 'reveal';
 
-  const entries = Object.entries(round.betCounts).map(([id, count]) => ({ artifactId: Number(id), count }));
+  // 以本轮全部 4 个兽首为基准统计票数（未获投票的兽首记为 0 票）
+  const entries = round.artifacts.map(a => ({ artifactId: a.id, count: round.betCounts[a.id] || 0 }));
 
-  if (entries.length === 0) { round.events.push('本轮无人押币。'); return; }
+  if (entries.every(e => e.count === 0)) { round.events.push('本轮无人押币。'); return; }
 
   // 统一排序：票数降序，票数相同时按生肖 ID 升序（鼠→猪）
-  // 排在第1位的隐藏，排在第2位的揭示真假
   entries.sort((a, b) => b.count - a.count || a.artifactId - b.artifactId);
 
   // 第1名：隐藏
@@ -415,19 +415,15 @@ export function resolveBets(room: Room): void {
   round.hiddenArtifactName = hiddenArtifact.name;
   round.events.push(`【${hiddenArtifact.name}】票数排名第一（${entries[0].count}票），已被隐藏。`);
 
-  // 第2名：揭示真假（即使只有 1 个兽首有票，也揭示该兽首）
+  // 第2名：揭示真假（票数第二多；并列时按生肖顺序取靠前者）
   let roundScore = 0;
-  const revealedId = entries.length >= 2 ? entries[1].artifactId : entries[0].artifactId;
+  const revealedId = entries[1].artifactId;
   round.revealedArtifactId = revealedId;
   const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
   const revealedIsReal = revealedArtifact.isReal;
   round.revealedArtifactName = revealedArtifact.name;
   round.revealedIsReal = revealedIsReal;
-  if (entries.length >= 2) {
-    round.events.push(`【${revealedArtifact.name}】票数排名第二（${entries[1].count}票），予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
-  } else {
-    round.events.push(`【${revealedArtifact.name}】唯一获投票兽首（${entries[0].count}票），予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
-  }
+  round.events.push(`【${revealedArtifact.name}】票数排名第二（${entries[1].count}票），予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
   if (revealedIsReal) {
     room.game.xuyuanScore += 1;
     roundScore = 1;
