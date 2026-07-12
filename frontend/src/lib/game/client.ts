@@ -12,6 +12,7 @@ interface GameState {
   me: { id: string; name: string; isHost: boolean; isAI: boolean; connected: boolean } | null;
   myRole: RoleId | null;
   myAppraisals: any;
+  skillHistory: Record<number, any>;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
   randomlyBlockedRounds: number[];
@@ -23,7 +24,7 @@ interface GameState {
 }
 
 let state: GameState = {
-  room: null, me: null, myRole: null, myAppraisals: {},
+  room: null, me: null, myRole: null, myAppraisals: {}, skillHistory: {},
   fangzhenResults: [], sealedRounds: [], randomlyBlockedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
   error: null, connected: false,
 };
@@ -43,6 +44,7 @@ interface HeartbeatResponse {
   room: PublicRoom;
   myRole: RoleId | null;
   myAppraisals: Record<number, AppraisalResult[]>;
+  skillHistory: Record<number, any>;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
   randomlyBlockedRounds: number[];
@@ -57,6 +59,7 @@ function applyHeartbeat(data: HeartbeatResponse): void {
     room: data.room, me,
     myRole: data.myRole,
     myAppraisals: data.myAppraisals,
+    skillHistory: data.skillHistory || {},
     fangzhenResults: data.fangzhenResults,
     sealedRounds: data.sealedRounds,
     randomlyBlockedRounds: data.randomlyBlockedRounds || [],
@@ -98,7 +101,7 @@ function stopPolling(): void {
 export async function connectGame(code: string, name: string, pid?: string): Promise<void> {
   roomCode = code.toUpperCase();
   setState({
-    room: null, me: null, myRole: null, myAppraisals: {},
+    room: null, me: null, myRole: null, myAppraisals: {}, skillHistory: {},
     fangzhenResults: [], sealedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
     error: null, connected: false,
   });
@@ -110,6 +113,7 @@ export async function connectGame(code: string, name: string, pid?: string): Pro
     applyHeartbeat({
       room: res.data.room, myRole: res.data.myRole || null,
       myAppraisals: res.data.myAppraisals || {},
+      skillHistory: res.data.skillHistory || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
       randomlyBlockedRounds: res.data.randomlyBlockedRounds || [],
@@ -130,6 +134,7 @@ export async function send(msg: ClientMessage): Promise<void> {
     applyHeartbeat({
       room: res.data.room, myRole: res.data.myRole || null,
       myAppraisals: res.data.myAppraisals || {},
+      skillHistory: res.data.skillHistory || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
       randomlyBlockedRounds: res.data.randomlyBlockedRounds || [],
@@ -162,7 +167,7 @@ export function disconnectGame(): void {
   stopPolling();
   playerId = null; roomCode = null;
   state = {
-    room: null, me: null, myRole: null, myAppraisals: [],
+    room: null, me: null, myRole: null, myAppraisals: [], skillHistory: {},
     fangzhenResults: [], sealedRounds: [], randomlyBlockedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
     error: null, connected: false,
   };

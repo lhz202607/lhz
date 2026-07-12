@@ -408,7 +408,7 @@ export default function GamePlay() {
 
               {rounds.map(r => {
                 const apps: any[] = game.myAppraisals?.[r] || [];
-                const fz = (myRole === 'fangzhen') ? game.fangzhenResults.find((x: any) => x.round === r) : null;
+                const skillEntry = game.skillHistory?.[r] || {};
                 const isCurrent = r === g.currentRound;
                 return (
                   <div key={r} className="mb-3 last:mb-0 border border-bronze/20 rounded-md p-2.5 bg-black/20">
@@ -429,37 +429,33 @@ export default function GamePlay() {
                       )}
                     </div>
 
-                    {/* 技能发动情况 */}
+                    {/* 技能发动情况（从 skillHistory 读取，不受每轮清空的影响） */}
                     <div className="mt-2 space-y-1">
                       <div className="text-[11px] text-ivory-dim">技能发动：</div>
-                      {myRole === 'fangzhen' && fz && (
+                      {myRole === 'fangzhen' && skillEntry.fangzhenCheckLog && (
                         <div className="text-xs bg-black/30 px-2 py-1 rounded">
-                          查验 <span className="text-ivory">{fz.targetName}</span>：
-                          <span className={fz.faction === 'xuyuan' ? 'text-jade' : 'text-vermilion'}>
-                            {fz.faction === 'xuyuan' ? ' 好人' : ' 坏人'}
+                          查验 <span className="text-ivory">{skillEntry.fangzhenCheckLog.targetName}</span>：
+                          <span className={skillEntry.fangzhenCheckLog.faction === 'xuyuan' ? 'text-jade' : 'text-vermilion'}>
+                            {skillEntry.fangzhenCheckLog.faction === 'xuyuan' ? ' 好人' : ' 坏人'}
                           </span>
                         </div>
                       )}
-                      {r === g.currentRound && (
-                        <>
-                          {myRole === 'yaoburan' && (me as any).yaoburanSealTarget && (
-                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
-                              封印之术：已偷袭一名玩家
-                            </div>
-                          )}
-                          {myRole === 'zhengguoqu' && (me as any).zhengguoquLockedArtifact != null && (
-                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
-                              封存兽首：本轮已封锁一只兽首
-                            </div>
-                          )}
-                          {myRole === 'laochaofeng' && (me as any).laochaofengUsedFlip && (
-                            <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
-                              颠倒乾坤：本轮已施展
-                            </div>
-                          )}
-                        </>
+                      {myRole === 'yaoburan' && skillEntry.yaoburanSealLog && (
+                        <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
+                          封印之术：已偷袭 <span className="text-ivory">{skillEntry.yaoburanSealLog.targetName}</span>
+                        </div>
                       )}
-                      {myRole === 'fangzhen' && !fz && (
+                      {myRole === 'zhengguoqu' && skillEntry.zhengguoquLockLog && (
+                        <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
+                          封存兽首：已封锁 <span className="text-ivory">{skillEntry.zhengguoquLockLog.artifactName}</span>
+                        </div>
+                      )}
+                      {myRole === 'laochaofeng' && skillEntry.laochaofengFlipLog && (
+                        <div className="text-xs bg-black/30 px-2 py-1 rounded text-vermilion">
+                          颠倒乾坤：本轮已施展
+                        </div>
+                      )}
+                      {myRole === 'fangzhen' && !skillEntry.fangzhenCheckLog && (
                         <div className="text-[11px] text-ivory-dim/70">（本轮未发动查验）</div>
                       )}
                       {myRole && (['xuyuan','huangyanyan','muhujianai','jiyunfu'].includes(myRole)) && (

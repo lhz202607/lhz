@@ -184,6 +184,14 @@ export interface GameRound {
   playerVotes?: Record<string, number[]>;
   /** 药不然本轮是否已发动过偷袭（每轮仅一次） */
   yaoburanSealUsedThisRound?: boolean;
+  /** 方震查验日志 */
+  fangzhenCheckLog?: { targetId: string; targetName: string; faction: Faction };
+  /** 药不然封印日志 */
+  yaoburanSealLog?: { targetId: string; targetName: string };
+  /** 郑国渠封存日志 */
+  zhengguoquLockLog?: { artifactId: number; artifactName: string };
+  /** 老朝奉颠倒日志 */
+  laochaofengFlipLog?: boolean;
 }
 
 export interface GameState {

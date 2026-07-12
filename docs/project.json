@@ -2,7 +2,7 @@
   "project_type": "web",
   "sub_project_type": "",
   "name": "古董局中局·十二兽首",
-  "app_slug": "antique-game",
-  "version_description": "Fix auto reveal before manual vote end",
-  "preview_type": "pc"
+  "app_slug": "ancient-game-zodiac",
+  "version_description": "Add room share link with visible URL and name input",
+  "preview_type": "mobile"
 }

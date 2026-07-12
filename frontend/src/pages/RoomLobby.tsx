@@ -2,27 +2,40 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { connectGame, disconnectGame, send, addAI, useGameState } from '@/lib/game/client';
 import { Button } from '@/components/ui/button';
-import { Copy, Crown, LogOut, Users, UserX, Bot, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Copy, Crown, LogOut, Users, UserX, Bot, Trash2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function RoomLobby() {
   const { code } = useParams<{ code: string }>();
   const [searchParams] = useSearchParams();
-  const name = searchParams.get('name') || '匿名玩家';
+  const urlName = searchParams.get('name') || '';
   const pid = searchParams.get('pid') || undefined;
   const navigate = useNavigate();
   const game = useGameState();
-  const [connecting, setConnecting] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  // 如果 URL 没有 name 参数（好友通过分享链接进入），需要先输入昵称
+  const [nickname, setNickname] = useState('');
+  const [needsName, setNeedsName] = useState(!urlName);
+
+  const doConnect = async (name: string) => {
+    if (!code) return;
+    setConnecting(true);
+    try {
+      await connectGame(code, name, pid);
+      setConnecting(false);
+    } catch {
+      toast.error('连接房间失败');
+      navigate('/');
+    }
+  };
 
   useEffect(() => {
     if (!code) return;
-    setConnecting(true);
-    connectGame(code, name, pid)
-      .then(() => setConnecting(false))
-      .catch(() => {
-        toast.error('连接房间失败');
-        navigate('/');
-      });
+    // URL 有 name 参数 → 直接连接
+    if (urlName) {
+      doConnect(urlName);
+    }
     return () => disconnectGame();
   }, [code]);
 
@@ -34,6 +47,37 @@ export default function RoomLobby() {
   const copyCode = () => {
     navigator.clipboard?.writeText(code || '');
     toast.success('房间码已复制');
+  };
+
+  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${code}` : '';
+
+  const copyLink = () => {
+    navigator.clipboard?.writeText(shareUrl).then(() => {
+      toast.success('邀请链接已复制，发送给微信好友即可加入');
+    }).catch(() => {
+      // clipboard 不可用则退而复制房间码
+      navigator.clipboard?.writeText(code || '');
+      toast.success(`房间码 ${code} 已复制，好友输入即可加入`);
+    });
+  };
+
+  const shareRoom = async () => {
+    const shareData = {
+      title: '古董局中局·十二兽首',
+      text: `来加入我的鉴宝局「${code}」，共鉴十二兽首真伪！`,
+      url: shareUrl,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (e: any) {
+        if (e.name === 'AbortError') return;
+        // 其他错误降级
+      }
+    }
+    // 降级：复制链接
+    copyLink();
   };
 
   const handleStart = async () => {
@@ -64,9 +108,48 @@ export default function RoomLobby() {
   // 游戏开始后跳转到游戏页
   useEffect(() => {
     if (room && room.game.phase !== 'waiting' && room.game.phase !== 'ended') {
-      navigate(`/play/${code}?name=${encodeURIComponent(name)}&pid=${pid || ''}`, { replace: true });
+      navigate(`/play/${code}?name=${encodeURIComponent(urlName || nickname)}&pid=${pid || ''}`, { replace: true });
     }
   }, [room?.game.phase]);
+
+  // 好友通过分享链接进入，先报上名号
+  if (needsName) {
+    return (
+      <div className="min-h-screen bg-antique flex items-center justify-center p-4">
+        <div className="card-antique-glow p-8 max-w-sm w-full space-y-6">
+          <div className="text-center">
+            <div className="font-brush text-3xl text-bronze mb-1">入局</div>
+            <div className="text-ivory-dim text-sm">请输入你的名号加入鉴宝局</div>
+            <div className="mt-2 font-mono text-xl tracking-[0.3em] text-gold-glow">房间：{code}</div>
+          </div>
+          <Input
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            placeholder="请输入昵称"
+            maxLength={12}
+            className="input-antique h-12 text-lg"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && nickname.trim()) {
+                setNeedsName(false);
+                doConnect(nickname.trim());
+              }
+            }}
+          />
+          <Button
+            onClick={() => {
+              if (!nickname.trim()) { toast.error('请输入昵称'); return; }
+              setNeedsName(false);
+              doConnect(nickname.trim());
+            }}
+            disabled={connecting || !nickname.trim()}
+            className="btn-seal w-full h-12 text-lg"
+          >
+            {connecting ? '加入中…' : '加入房间'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (connecting || !room) {
     return (
@@ -105,20 +188,41 @@ export default function RoomLobby() {
 
         {/* 房间码卡片 */}
         <div className="card-antique-glow p-6 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-ivory-dim text-sm mb-1">房间邀请码</div>
               <div className="font-mono text-4xl tracking-[0.3em] text-bronze font-bold">{room.code}</div>
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={shareRoom}
+                className="btn-ghost px-4 py-3 rounded-md flex items-center gap-2"
+              >
+                <Share2 className="w-4 h-4" /> 分享
+              </button>
+              <button
+                onClick={copyCode}
+                className="btn-ghost px-4 py-3 rounded-md flex items-center gap-2"
+              >
+                <Copy className="w-4 h-4" /> 复制
+              </button>
+            </div>
+          </div>
+
+          {/* 邀请链接 — 直观显示 */}
+          <div className="bg-black/30 rounded-md p-3 border border-bronze/20">
+            <div className="text-ivory-dim text-[10px] mb-1">邀请链接（点击复制）</div>
             <button
-              onClick={copyCode}
-              className="btn-ghost px-4 py-3 rounded-md flex items-center gap-2"
+              onClick={copyLink}
+              className="w-full text-left text-xs text-gold-glow font-mono truncate hover:text-bronze transition-colors"
+              title="点击复制邀请链接"
             >
-              <Copy className="w-4 h-4" /> 复制
+              {shareUrl}
             </button>
           </div>
-          <div className="text-ivory-dim text-xs mt-3">
-            将此房间码分享给好友，他们输入即可加入联机对局。
+
+          <div className="text-ivory-dim text-xs mt-3 flex items-center gap-2">
+            <span>分享链接给微信好友，好友点击即可加入对局</span>
           </div>
         </div>
 

@@ -25,6 +25,35 @@ function buildAllAppraisals(room: any, playerId: string): Record<number, any[]> 
   return result;
 }
 
+/** 构建完整技能历史（从各轮 GameRound 日志中提取，不受每轮清空 player 字段影响） */
+function buildSkillHistory(room: any, viewerId: string): Record<number, any> {
+  const viewer = room.players.find((p: any) => p.id === viewerId);
+  if (!viewer || !viewer.role) return {};
+  const role = viewer.role as string;
+  const history: Record<number, any> = {};
+  for (const round of (room.game.rounds || [])) {
+    if (!round) continue;
+    const rn = round.roundNumber;
+    const entry: any = {};
+    if (role === 'fangzhen' && round.fangzhenCheckLog) {
+      entry.fangzhenCheckLog = round.fangzhenCheckLog;
+    }
+    if (role === 'yaoburan' && round.yaoburanSealLog) {
+      entry.yaoburanSealLog = round.yaoburanSealLog;
+    }
+    if (role === 'zhengguoqu' && round.zhengguoquLockLog) {
+      entry.zhengguoquLockLog = round.zhengguoquLockLog;
+    }
+    if (role === 'laochaofeng' && round.laochaofengFlipLog) {
+      entry.laochaofengFlipLog = true;
+    }
+    if (Object.keys(entry).length > 0) {
+      history[rn] = entry;
+    }
+  }
+  return history;
+}
+
 /** 创建房间 */
 gameRouter.post('/rooms', (req, res) => {
   const { name, maxPlayers } = req.body || {};
@@ -105,6 +134,7 @@ gameRouter.post('/rooms/:code/heartbeat', (req, res) => {
     room: roomManager.toPublicRoom(room, playerId),
     myRole: viewer?.role || null,
     myAppraisals: buildAllAppraisals(room, playerId),
+    skillHistory: buildSkillHistory(room, playerId),
     fangzhenResults: viewer?.fangzhenCheckResult ? [{
       round: room.game.currentRound, targetId: viewer.fangzhenCheckTarget!,
       targetName: room.players.find(p => p.id === viewer.fangzhenCheckTarget)?.name || '',
@@ -307,6 +337,7 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
     room: roomManager.toPublicRoom(room, playerId),
     myRole: viewer?.role || null,
     myAppraisals: buildAllAppraisals(room, playerId),
+    skillHistory: buildSkillHistory(room, playerId),
     fangzhenResults: viewer?.fangzhenCheckResult ? [{
       round: room.game.currentRound, targetId: viewer.fangzhenCheckTarget!,
       targetName: room.players.find(p => p.id === viewer.fangzhenCheckTarget)?.name || '',

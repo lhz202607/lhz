@@ -315,6 +315,8 @@ export function laochaofengUseFlip(room: Room, playerId: string, use: boolean): 
   if (room.game.phase !== 'appraise') return { ok: false, error: '仅鉴宝阶段可使用' };
   round.laochaofengUsedFlip = use;
   player.laochaofengUsedFlip = use;
+  // 写入本轮日志
+  if (use) round.laochaofengFlipLog = true;
   return { ok: true };
 }
 
@@ -343,6 +345,8 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
     // 前置位：延迟到下一轮生效，本轮照常鉴宝
     room.game.pendingSeals[targetId] = room.game.currentRound + 1;
     const tname = target.name;
+    // 写入本轮日志（延迟封印也记录）
+    round.yaoburanSealLog = { targetId, targetName: tname };
     // 机密信息：仅药不然本人可见
     round.secretEvents = round.secretEvents || [];
     round.secretEvents.push(`你偷袭了${tname}（前置位），封印将于下一轮生效。`);
@@ -366,6 +370,8 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
       room.game.skipRoundsMap[target.id] = Math.min(room.game.currentRound + 1, 3);
       if (rs) rs.randomlyBlocked = false; // 本轮由封印顶替，避免双重提示
     }
+    // 写入本轮日志
+    round.yaoburanSealLog = { targetId, targetName: target.name };
     // 机密信息：仅药不然本人可见（不向其他玩家及老朝奉泄露偷袭目标）
     round.secretEvents = round.secretEvents || [];
     round.secretEvents.push(`你偷袭了${target.name}（后置位），其本轮被封印，下位行动受限。`);
@@ -384,6 +390,8 @@ export function zhengguoquLock(room: Room, playerId: string, artifactId: number)
   if (!artifact) return { ok: false, error: '兽首不存在' };
   round.lockedArtifactId = artifactId;
   player.zhengguoquLockedArtifact = artifactId;
+  // 写入本轮日志
+  round.zhengguoquLockLog = { artifactId, artifactName: artifact.name };
   return { ok: true };
 }
 
@@ -397,6 +405,11 @@ export function fangzhenCheck(room: Room, playerId: string, targetId: string): {
   const faction = ROLES[target.role].faction;
   player.fangzhenCheckTarget = targetId;
   player.fangzhenCheckResult = faction;
+  // 写入本轮日志，确保历史行动中能查到过去轮次的使用记录
+  const round = room.game.rounds[room.game.currentRound - 1];
+  if (round) {
+    round.fangzhenCheckLog = { targetId, targetName: target.name, faction };
+  }
   return { ok: true, faction };
 }
 
