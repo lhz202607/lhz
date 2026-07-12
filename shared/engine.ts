@@ -190,7 +190,7 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
 
   room.players.forEach(p => {
     if (!game.playerRoundStates[p.id]) game.playerRoundStates[p.id] = {};
-    const randomlyBlocked = game.skipRoundsMap?.[p.id] === roundNumber;
+    let randomlyBlocked = game.skipRoundsMap?.[p.id] === roundNumber;
     // 应用上一轮药不然对前置位玩家的延迟封印（仅生效一轮）
     let sealed = false;
     if (game.pendingSeals[p.id] === roundNumber) {
@@ -203,6 +203,12 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
           game.playerRoundStates[xuyuan.id][roundNumber].fangzhenSealPenalty = true;
         }
       }
+    }
+    // 木户加奈/黄烟烟：若本轮既是「随机无法鉴宝轮」又恰被封印占用，则本轮由封印顶替，
+    // 随机封锁额度顺延到下一轮（保证整局仍随机一轮无法鉴宝，不因被偷袭而凭空消失）
+    if (randomlyBlocked && sealed && game.skipRoundsMap[p.id] !== undefined) {
+      randomlyBlocked = false;
+      game.skipRoundsMap[p.id] = Math.min(roundNumber + 1, 3);
     }
     game.playerRoundStates[p.id][roundNumber] = { sealed, randomlyBlocked, appraisals: [] };
   });
@@ -350,6 +356,12 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
         const xrs = room.game.playerRoundStates[xuyuan.id]?.[room.game.currentRound];
         if (xrs) xrs.fangzhenSealPenalty = true;
       }
+    }
+    // 木户加奈/黄烟烟：若本轮恰是其「随机无法鉴宝轮」被封印占用，则顺延随机封锁到下一轮
+    if ((target.role === 'muhujianai' || target.role === 'huangyanyan')
+      && room.game.skipRoundsMap[target.id] === room.game.currentRound) {
+      room.game.skipRoundsMap[target.id] = Math.min(room.game.currentRound + 1, 3);
+      if (rs) rs.randomlyBlocked = false; // 本轮由封印顶替，避免双重提示
     }
     // 机密信息：仅药不然本人可见（不向其他玩家及老朝奉泄露偷袭目标）
     round.secretEvents = round.secretEvents || [];
