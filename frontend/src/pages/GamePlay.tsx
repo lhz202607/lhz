@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { connectGame, disconnectGame, send, useGameState } from '@/lib/game/client';
 import { ROLE_INFO } from '@/lib/game/roles';
-import BackgroundMusic from '@/components/BackgroundMusic';
 import { RoleId } from '@/shared/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,7 +67,6 @@ export default function GamePlay() {
 
   return (
     <div className="min-h-screen bg-antique p-3 lg:p-5">
-      <BackgroundMusic />
       <div className="max-w-7xl mx-auto">
         {/* 顶部状态栏 */}
         <header className="card-antique px-3 py-2 sm:px-4 sm:py-3 mb-3 sm:mb-4 flex items-center justify-between flex-wrap gap-2 sm:gap-3">
@@ -76,7 +74,7 @@ export default function GamePlay() {
             <div className="font-brush text-xl sm:text-2xl text-bronze">古董局中局</div>
             <div className="text-ivory-dim text-[10px] sm:text-xs">房间 {room.code}</div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4 pr-10 sm:pr-0">
+          <div className="flex items-center gap-2 sm:gap-4">
             <div className="text-center">
               <div className="text-ivory-dim text-[10px] sm:text-xs">轮次</div>
               <div className="text-bronze font-bold text-sm sm:text-base">{g.currentRound} / 3</div>
