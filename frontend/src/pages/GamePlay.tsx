@@ -422,17 +422,14 @@ export default function GamePlay() {
                     </div>
                     <div className="space-y-1">
                       <div className="text-[11px] text-ivory-dim">鉴宝结果：</div>
-                      {apps.length > 0 ? apps.map((a: any, i: number) => {
-                        const art = g.artifacts.find((x: any) => x.id === a.artifactId);
-                        return (
-                          <div key={i} className="text-xs bg-black/30 px-2 py-1 rounded flex justify-between">
-                            <span className="text-ivory">{art?.name || '兽首'}</span>
-                            <span className={a.appearsReal ? 'text-jade' : 'text-vermilion'}>
-                              {a.appearsReal ? '看似真品' : '看似赝品'}
-                            </span>
-                          </div>
-                        );
-                      }) : (
+                      {apps.length > 0 ? apps.map((a: any, i: number) => (
+                        <div key={i} className="text-xs bg-black/30 px-2 py-1 rounded flex justify-between">
+                          <span className="text-ivory">{a.artifactName || '兽首'}</span>
+                          <span className={a.appearsReal ? 'text-jade' : 'text-vermilion'}>
+                            {a.appearsReal ? '看似真品' : '看似赝品'}
+                          </span>
+                        </div>
+                      )) : (
                         <div className="text-[11px] text-ivory-dim/70">（本轮未鉴宝或未行动）</div>
                       )}
                     </div>

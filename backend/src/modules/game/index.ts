@@ -15,7 +15,12 @@ function buildAllAppraisals(room: any, playerId: string): Record<number, any[]> 
   if (!states) return {};
   const result: Record<number, any[]> = {};
   for (const [roundNum, state] of Object.entries(states)) {
-    result[Number(roundNum)] = (state as any).appraisals || [];
+    const apps = ((state as any).appraisals || []).map((a: any) => {
+      const round = room.game.rounds[Number(roundNum) - 1];
+      const art = round?.artifacts?.find((x: any) => x.id === a.artifactId);
+      return { ...a, artifactName: art?.name || ('兽首#' + a.artifactId) };
+    });
+    result[Number(roundNum)] = apps;
   }
   return result;
 }

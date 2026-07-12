@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局·十二兽首",
   "app_slug": "antique-game",
-  "version_description": "Fix Fangzhen turn skip for no-appraise roles",
+  "version_description": "Fix hidden artifact reveal, seal display, flip scope",
   "preview_type": "pc"
 }
