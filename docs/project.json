@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Fix bet reveal edge cases and rule robustness",
+  "version_description": "Add zhengguoqu skip, bg music mute, mobile tweaks",
   "preview_type": "pc"
 }
