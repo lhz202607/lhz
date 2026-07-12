@@ -384,7 +384,7 @@ export default function GamePlay() {
 
       {/* 角色揭示弹窗 */}
       {showRoleCard && roleInfo && (
-        <RoleRevealModal roleInfo={roleInfo} onClose={() => setShowRoleCard(false)} />
+        <RoleRevealModal roleInfo={roleInfo} knownAllies={knownAllies} onClose={() => setShowRoleCard(false)} />
       )}
 
       {game.error && (
@@ -1521,7 +1521,8 @@ function RevealPanel({ room, game }: { room: any; game: any }) {
 // ============================================================
 // 角色揭示弹窗
 // ============================================================
-function RoleRevealModal({ roleInfo, onClose }: { roleInfo: any; onClose: () => void }) {
+function RoleRevealModal({ roleInfo, knownAllies, onClose }: { roleInfo: any; knownAllies: any[]; onClose: () => void }) {
+  const [revealed, setRevealed] = useState(false);
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -1529,37 +1530,74 @@ function RoleRevealModal({ roleInfo, onClose }: { roleInfo: any; onClose: () => 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-center mb-4">
-          <div className="text-ivory-dim text-sm mb-1">你的身份是</div>
-          <div className={`text-xs px-3 py-1 rounded-full inline-block mb-4 ${
-            roleInfo.faction === 'xuyuan' ? 'text-jade border border-jade/40' : 'text-vermilion border border-vermilion/40'
-          }`}>
-            {roleInfo.faction === 'xuyuan' ? '许愿阵营 · 好人' : '老朝奉阵营 · 坏人'}
-          </div>
+          <div className="font-brush text-2xl text-gold-glow mb-2">身份已分配</div>
+          <div className="text-ivory-dim text-xs">你的角色与队友信息已隐藏，点击下方按钮查看</div>
         </div>
 
-        <div className="flex flex-col items-center mb-4">
-          <div
-            className="w-24 h-24 rounded-xl flex items-center justify-center font-brush text-5xl mb-3 animate-glow"
-            style={{background: `${roleInfo.color}22`, color: roleInfo.color, border: `2px solid ${roleInfo.color}`}}
+        {revealed ? (
+          <>
+            <div className="text-center mb-4">
+              <div className={`text-xs px-3 py-1 rounded-full inline-block mb-4 ${
+                roleInfo.faction === 'xuyuan' ? 'text-jade border border-jade/40' : 'text-vermilion border border-vermilion/40'
+              }`}>
+                {roleInfo.faction === 'xuyuan' ? '许愿阵营 · 好人' : '老朝奉阵营 · 坏人'}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center mb-4">
+              <div
+                className="w-24 h-24 rounded-xl flex items-center justify-center font-brush text-5xl mb-3 animate-glow"
+                style={{background: `${roleInfo.color}22`, color: roleInfo.color, border: `2px solid ${roleInfo.color}`}}
+              >
+                {roleInfo.glyph}
+              </div>
+              <div className="font-brush text-4xl mb-1" style={{color: roleInfo.color}}>{roleInfo.name}</div>
+              <div className="text-ivory-dim text-sm">{roleInfo.title}</div>
+            </div>
+
+            <div className="bg-black/30 p-3 rounded-md mb-3">
+              <div className="text-bronze text-xs mb-1">技能</div>
+              <div className="text-ivory text-sm leading-relaxed">{roleInfo.ability}</div>
+            </div>
+
+            {/* 已知队友（老朝奉阵营） */}
+            {knownAllies && knownAllies.length > 0 && (
+              <div className="bg-vermilion/10 border border-vermilion/20 p-3 rounded-md mb-3">
+                <div className="text-vermilion text-xs font-bold mb-1 flex items-center gap-1">
+                  <Eye className="w-3 h-3" /> 已知队友
+                </div>
+                <div className="space-y-1">
+                  {knownAllies.map((ally: any) => {
+                    const allyRole = (ROLE_INFO as any)[ally.roleId];
+                    return (
+                      <div key={ally.playerId} className="flex items-center gap-1.5 bg-black/20 px-2 py-1 rounded">
+                        <div className="player-token w-5 h-5 text-[9px]">{ally.playerName[0]}</div>
+                        <span className="text-xs text-ivory">{ally.playerName}</span>
+                        <span className="text-xs text-vermilion font-bold">·</span>
+                        <span className="text-xs text-vermilion">{allyRole?.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-black/20 p-3 rounded-md mb-4">
+              <div className="text-ivory-dim text-xs">{roleInfo.bio}</div>
+            </div>
+
+            <Button onClick={onClose} className="btn-seal w-full h-12 text-lg">
+              入 局
+            </Button>
+          </>
+        ) : (
+          <button
+            onClick={() => setRevealed(true)}
+            className="btn-bronze w-full h-12 text-lg"
           >
-            {roleInfo.glyph}
-          </div>
-          <div className="font-brush text-4xl mb-1" style={{color: roleInfo.color}}>{roleInfo.name}</div>
-          <div className="text-ivory-dim text-sm">{roleInfo.title}</div>
-        </div>
-
-        <div className="bg-black/30 p-3 rounded-md mb-3">
-          <div className="text-bronze text-xs mb-1">技能</div>
-          <div className="text-ivory text-sm leading-relaxed">{roleInfo.ability}</div>
-        </div>
-
-        <div className="bg-black/20 p-3 rounded-md mb-4">
-          <div className="text-ivory-dim text-xs">{roleInfo.bio}</div>
-        </div>
-
-        <Button onClick={onClose} className="btn-seal w-full h-12 text-lg">
-          入 局
-        </Button>
+            点击查看身份 ▸
+          </button>
+        )}
       </div>
     </div>
   );
