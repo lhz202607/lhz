@@ -3,6 +3,7 @@ services:
     name: antique-game
     runtime: node
     plan: free
+    nodeVersion: "20"
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
