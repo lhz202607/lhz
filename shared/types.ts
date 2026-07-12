@@ -129,6 +129,8 @@ export interface Player {
   name: string;
   isHost: boolean;
   isAI: boolean;
+  /** 座位号（落座顺序，游戏开始后绑定） */
+  seatNumber: number;
   role?: RoleId;
   connected: boolean;
   permanentlyDisabled?: boolean;
@@ -167,9 +169,13 @@ export interface GameRound {
   /** 本轮许愿阵营得分增量（揭示真品+1，鉴人环节另计） */
   roundScore?: number;
   events: string[];
+  /** 机密事件（仅老朝奉阵营可见，如药不然偷袭目标） */
+  secretEvents?: string[];
   currentAppraiserId?: string;
-  /** 鉴宝行动顺序（所有玩家随机排列） */
+  /** 鉴宝行动顺序（所有玩家随机排列，初始顺序） */
   appraiseOrder: string[];
+  /** 本轮实际发生鉴宝行动的玩家顺序（按发生先后，动态累加） */
+  actualOrder: string[];
   finishedAppraisers: string[];
   /** 投票明细（投票结束后记录每位玩家投了哪些兽首） */
   playerVotes?: Record<string, number[]>;
@@ -226,7 +232,8 @@ export type ClientMessage =
   | { type: 'nextRound' }
   | { type: 'identifyVote'; targetId: string }  // 鉴人环节投票
   | { type: 'disbandRoom' }
-  | { type: 'restart' };
+  | { type: 'restart' }
+  | { type: 'changeSeat'; targetId: string };  // 落座阶段与某玩家交换座位
 
 export type ServerMessage =
   | { type: 'joined'; room: PublicRoom; you: PublicPlayer }
@@ -242,6 +249,8 @@ export interface PublicPlayer {
   isHost: boolean;
   isAI: boolean;
   connected: boolean;
+  /** 座位号（全员可见，用于落座辨认） */
+  seatNumber: number;
   role?: RoleId;
   hasSpoken?: boolean;
   betArtifactIds?: number[];
@@ -272,13 +281,16 @@ export interface PublicRoom {
     flipUsedThisRound: boolean;
     currentAppraiserId?: string;
     finishedAppraisers: string[];
-    /** 鉴宝行动顺序（全员可见） */
+    /** 鉴宝行动顺序（初始随机/轮转顺序，全员可见） */
     appraiseOrder: string[];
+    /** 本轮实际发生鉴宝行动的玩家顺序（按发生先后动态累加） */
+    actualOrder: string[];
     /** 鉴人环节投票状态 */
     identifyVotes: Record<string, string>;
     /** 历史轮次数据（行动顺序等） */
     rounds: {
       appraiseOrder: string[];
+      actualOrder: string[];
       finishedAppraisers: string[];
       playerVotes?: Record<string, number[]>;
       hiddenArtifactName?: string;

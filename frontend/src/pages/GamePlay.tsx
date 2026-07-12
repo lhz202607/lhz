@@ -20,6 +20,7 @@ export default function GamePlay() {
   const [connecting, setConnecting] = useState(true);
   const [speech, setSpeech] = useState('');
   const [showRoleCard, setShowRoleCard] = useState(false);
+  const [seatSwapMode, setSeatSwapMode] = useState(false);
 
   useEffect(() => {
     if (!code) return;
@@ -100,22 +101,28 @@ export default function GamePlay() {
               <ScrollText className="w-4 h-4" /> 入席名册
             </div>
             <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0">
-              {room.players.map((p, i) => {
+              {[...room.players]
+                .sort((a: any, b: any) => (a.seatNumber || 99) - (b.seatNumber || 99))
+                .map((p: any) => {
                 const isMe = p.id === me.id;
                 const isCurrentSpeaker = g.phase === 'discuss' && g.speechOrder[g.currentSpeakerIndex] === p.id;
                 const isCurrentAppraiser = g.phase === 'appraise' && g.currentAppraiserId === p.id;
                 const hasFinishedAppraise = (g.finishedAppraisers || []).includes(p.id);
                 const appraiseIdx = (g.appraiseOrder || []).indexOf(p.id);
+                const canSwapTarget = seatSwapMode && !isMe;
                 return (
                   <div
                     key={p.id}
+                    onClick={() => {
+                      if (canSwapTarget) { send({ type: 'changeSeat', targetId: p.id }); setSeatSwapMode(false); }
+                    }}
                     className={`p-2 rounded-md border transition-all min-w-[140px] lg:min-w-0 shrink-0 lg:shrink ${
                       (isCurrentSpeaker || isCurrentAppraiser) ? 'border-gold-glow animate-glow' : 'border-bronze/20'
-                    } ${isMe ? 'bg-bronze/10' : 'bg-black/20'}`}
+                    } ${isMe ? 'bg-bronze/10' : 'bg-black/20'} ${canSwapTarget ? 'cursor-pointer ring-2 ring-gold-glow/60' : ''}`}
                   >
                     <div className="flex items-center gap-2">
-                      <div className="player-token w-7 h-7 sm:w-8 sm:h-8 text-sm shrink-0" style={{fontSize: '12px'}}>
-                        {p.name[0]}
+                      <div className="player-token w-7 h-7 sm:w-8 sm:h-8 text-sm shrink-0 flex items-center justify-center" style={{fontSize: '12px'}}>
+                        {p.seatNumber && p.seatNumber > 0 ? p.seatNumber : p.name[0]}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1">
@@ -126,6 +133,9 @@ export default function GamePlay() {
                           {p.isAI && <Bot className="w-3 h-3 text-ivory-dim shrink-0" />}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {p.seatNumber > 0 && (
+                            <span className="text-[10px] text-bronze/70">座位 {p.seatNumber}</span>
+                          )}
                           {g.phase === 'appraise' && appraiseIdx >= 0 && (
                             <span className="text-[10px] text-ivory-dim">#{appraiseIdx + 1}</span>
                           )}
@@ -155,6 +165,30 @@ export default function GamePlay() {
                 );
               })}
             </div>
+
+            {/* 落座阶段：可调整座位 */}
+            {g.phase === 'waiting' && (
+              <div className="mt-3">
+                {!seatSwapMode ? (
+                  <button
+                    onClick={() => setSeatSwapMode(true)}
+                    className="btn-ghost w-full h-9 text-xs border border-bronze/30"
+                  >
+                    调整座位（与某人交换）
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-[10px] text-gold-glow text-center">点击其他玩家与其交换座位</div>
+                    <button
+                      onClick={() => setSeatSwapMode(false)}
+                      className="btn-bronze w-full h-9 text-xs"
+                    >
+                      取消
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {g.phase === 'ended' && (
               <div className="mt-4 space-y-2">
@@ -600,6 +634,8 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const roleInfo = myRole ? ROLE_INFO[myRole as any] : null;
   const myAppraisals = game.myAppraisals[g.currentRound] || [];
   const sealedRound = game.sealedRounds.includes(g.currentRound);
+  const myRS = game.playerRoundStates?.[me.id]?.[g.currentRound];
+  const randomlyBlockedRound = !!(myRS && myRS.randomlyBlocked && !myRS.sealed);
   const [turnEnded, setTurnEnded] = useState(false);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [popupResult, setPopupResult] = useState<any>(null);
@@ -632,7 +668,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const appraiseDone = !canAppraise || remaining <= 0;
 
   const handleAppraise = (artifactId: number) => {
-    if (sealedRound) { toast.error('你被药不然封印，本轮无法鉴宝'); return; }
+    if (sealedRound) { toast.error(randomlyBlockedRound ? '你本轮心神不宁，无法鉴宝' : '你被药不然封印，本轮无法鉴宝'); return; }
     if (remaining <= 0) { toast.error('本轮鉴宝次数已用完'); return; }
     // 非郑国渠尝试鉴定被隐藏的兽首
     const art = g.artifacts.find((a: any) => a.id === artifactId);
@@ -662,16 +698,22 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
           </div>
         ) : (
           <div className="text-sm text-vermilion">
-            {sealedRound ? '本轮已被封印' : roleInfo.appraiseCount === 0 ? '本角色不擅鉴宝' : '无法鉴宝'}
+            {sealedRound ? (randomlyBlockedRound ? '本轮心神不宁' : '本轮已被封印') : roleInfo.appraiseCount === 0 ? '本角色不擅鉴宝' : '无法鉴宝'}
           </div>
         )}
       </div>
 
       {/* 当前鉴宝者提示 */}
       {isMyTurn && (
-        <div className="bg-gold-glow/10 border border-gold-glow/30 rounded-md px-3 py-2 text-gold-glow text-sm font-bold text-center">
-          轮到你鉴宝
-        </div>
+        sealedRound ? (
+          <div className="bg-vermilion/10 border border-vermilion/30 rounded-md px-3 py-2 text-vermilion text-sm font-bold text-center">
+            {randomlyBlockedRound ? '轮到你，但本轮心神不宁，无法鉴宝' : '轮到你，但本轮已被封印'}
+          </div>
+        ) : (
+          <div className="bg-gold-glow/10 border border-gold-glow/30 rounded-md px-3 py-2 text-gold-glow text-sm font-bold text-center">
+            轮到你鉴宝
+          </div>
+        )
       )}
       {!isMyTurn && g.currentAppraiserId && (
         <div className="text-ivory-dim text-sm text-center">
@@ -679,8 +721,8 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
         </div>
       )}
 
-      {/* 技能操作区（回合结束前可见） */}
-      {isMyTurn && !turnEnded && <SkillPanel room={room} game={game} />}
+      {/* 技能操作区（回合结束前可见，封印/心神不宁时不可用） */}
+      {isMyTurn && !turnEnded && !sealedRound && <SkillPanel room={room} game={game} />}
 
       {/* 兽首选择鉴宝（回合结束前可见） */}
       {isMyTurn && !turnEnded && canAppraise && remaining > 0 && (
@@ -734,7 +776,9 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
               <div className="text-vermilion text-sm font-bold mb-1">本回合无法鉴宝</div>
               <div className="text-ivory-dim text-xs mb-3">
                 {sealedRound
-                  ? '你被药不然封印，本回合无法鉴宝或发动技能，请指定下一位玩家。'
+                  ? (randomlyBlockedRound
+                      ? '你本轮心神不宁，无法鉴宝或发动技能，请指定下一位玩家。'
+                      : '你被药不然封印，本回合无法鉴宝或发动技能，请指定下一位玩家。')
                   : roleInfo.appraiseCount === 0
                   ? '你的角色不擅鉴宝，请指定下一位玩家。'
                   : '你的鉴宝次数已用完，请指定下一位玩家。'}
@@ -813,7 +857,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
 }
 
 // ============================================================
-// 行动顺序面板（显示当前轮及历史轮次）
+// 行动顺序面板（显示当前轮及历史轮次，按实际发生先后排列）
 // ============================================================
 function AppraiseOrderPanel({ room, game }: { room: any; game: any }) {
   const g = room.game;
@@ -826,9 +870,16 @@ function AppraiseOrderPanel({ room, game }: { room: any; game: any }) {
       </div>
       {[1, 2, 3].map(roundNum => {
         const roundData = roundNum <= currentRound ? (g.rounds || [])[roundNum - 1] : null;
-        const order = roundData?.appraiseOrder || (roundNum === currentRound ? g.appraiseOrder : null);
-        if (!order || order.length === 0) return null;
+        if (!roundData) return null;
         const isCurrent = roundNum === currentRound;
+        // 实际发生的行动顺序（动态累加）；本轮还包含尚未行动者的占位提示
+        const actual: string[] = roundData.actualOrder || roundData.appraiseOrder || [];
+        // 本轮尚未行动、但实际顺序中还不存在的玩家（补在末尾作"待行动"）
+        const pending = isCurrent
+          ? (roundData.appraiseOrder || []).filter((pid: string) => !actual.includes(pid) && !(roundData.finishedAppraisers || []).includes(pid))
+          : [];
+        const order = [...actual, ...pending];
+        if (order.length === 0) return null;
 
         return (
           <div key={roundNum} className={`mb-3 last:mb-0 ${!isCurrent ? 'opacity-50' : ''}`}>
@@ -836,30 +887,39 @@ function AppraiseOrderPanel({ room, game }: { room: any; game: any }) {
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-gold-glow animate-glow' : 'bg-bronze/40'}`}></span>
               第{roundNum}轮{isCurrent ? ' · 当前' : ' · 已完成'}
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-0.5">
               {order.map((pid: string, idx: number) => {
                 const player = room.players.find((p: any) => p.id === pid);
-                const isFinished = roundData?.finishedAppraisers?.includes(pid);
+                const isFinished = (roundData.finishedAppraisers || []).includes(pid);
                 const isCurrentAppraiser = isCurrent && g.currentAppraiserId === pid;
                 const isMe = pid === game.me?.id;
+                const isPending = isCurrent && !actual.includes(pid) && !isFinished;
+                const showArrow = idx < order.length - 1;
                 return (
-                  <div
-                    key={pid}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all ${
-                      isCurrentAppraiser
-                        ? 'bg-gold-glow/15 text-gold-glow border border-gold-glow/50 ring-active'
-                        : isFinished
-                        ? 'bg-black/20 text-ivory-dim line-through decoration-jade/40'
-                        : 'bg-black/30 text-ivory'
-                    }`}
-                  >
-                    <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                      isCurrentAppraiser ? 'bg-gold-glow text-ink' : isFinished ? 'bg-jade/30 text-jade' : 'bg-bronze/30 text-bronze'
-                    }`}>
-                      {isFinished && !isCurrentAppraiser ? '✓' : idx + 1}
-                    </span>
-                    <span className={`flex-1 truncate ${isMe ? 'font-bold' : ''}`}>{player?.name || '?'}{isMe ? '（我）' : ''}</span>
-                    {isCurrentAppraiser && <span className="text-[10px] font-bold animate-pulse">鉴宝中</span>}
+                  <div key={pid}>
+                    <div
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all ${
+                        isCurrentAppraiser
+                          ? 'bg-gold-glow/15 text-gold-glow border border-gold-glow/50 ring-active'
+                          : isFinished
+                          ? 'bg-black/20 text-ivory-dim line-through decoration-jade/40'
+                          : isPending
+                          ? 'bg-black/30 text-ivory-dim/50 border border-dashed border-bronze/20'
+                          : 'bg-black/30 text-ivory'
+                      }`}
+                    >
+                      <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        isCurrentAppraiser ? 'bg-gold-glow text-ink' : isFinished ? 'bg-jade/30 text-jade' : isPending ? 'bg-bronze/20 text-bronze/60' : 'bg-bronze/30 text-bronze'
+                      }`}>
+                        {isFinished && !isCurrentAppraiser ? '✓' : idx + 1}
+                      </span>
+                      <span className={`flex-1 truncate ${isMe ? 'font-bold' : ''}`}>{player?.name || '?'}{isMe ? '（我）' : ''}</span>
+                      {isCurrentAppraiser && <span className="text-[10px] font-bold animate-pulse">鉴宝中</span>}
+                      {isPending && <span className="text-[10px] text-ivory-dim/50">待行动</span>}
+                    </div>
+                    {showArrow && (
+                      <div className="flex justify-center my-0.5 text-bronze/40 text-[10px] leading-none">↓</div>
+                    )}
                   </div>
                 );
               })}

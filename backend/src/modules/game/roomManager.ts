@@ -87,6 +87,7 @@ class RoomManager {
       const isSealedViewer = viewerId ? room.players.find(pl => pl.id === viewerId)?.role === 'yaoburan' : false;
       return {
         id: p.id, name: p.name, isHost: p.isHost, isAI: p.isAI, connected: p.connected,
+        seatNumber: p.seatNumber,
         hasSpoken: p.hasSpoken,
         betArtifactIds: (room.game.phase === 'vote' || room.game.phase === 'reveal' || room.game.phase === 'ended') ? p.betArtifactIds : undefined,
         visiblySealed: isSealedViewer ? rs?.sealed : undefined,
@@ -104,6 +105,11 @@ class RoomManager {
     let events: string[] = [];
     let flipUsedThisRound = false;
     let appraiseOrder: string[] = [];
+    let actualOrder: string[] = [];
+
+    // 机密事件（药不然偷袭目标）仅药不然本人可见
+    const viewerRole = viewerId ? room.players.find(p => p.id === viewerId)?.role : undefined;
+    const isYaoburanViewer = viewerRole === 'yaoburan';
 
     if (round) {
       flipUsedThisRound = round.laochaofengUsedFlip;
@@ -114,8 +120,10 @@ class RoomManager {
       }));
       speechOrder = round.speechOrder;
       currentSpeakerIndex = round.currentSpeakerIndex;
-      events = round.events;
+      // 普通事件全员可见；机密事件仅药不然本人可见
+      events = isYaoburanViewer ? [...round.events, ...(round.secretEvents || [])] : [...round.events];
       appraiseOrder = round.appraiseOrder;
+      actualOrder = round.actualOrder || [];
       room.players.forEach(p => { if (p.speech) speeches[p.id] = p.speech; });
 
       if (isReveal) {
@@ -140,9 +148,11 @@ class RoomManager {
         currentAppraiserId: round?.currentAppraiserId,
         finishedAppraisers: round?.finishedAppraisers || [],
         appraiseOrder,
+        actualOrder,
         identifyVotes: room.game.identifyVotes || {},
         rounds: room.game.rounds.map(r => ({
           appraiseOrder: r.appraiseOrder,
+          actualOrder: r.actualOrder || [],
           finishedAppraisers: r.finishedAppraisers,
           playerVotes: r.playerVotes,
           hiddenArtifactName: r.hiddenArtifactName,

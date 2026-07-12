@@ -77,9 +77,10 @@ gameRouter.post('/rooms/:code/join', (req, res) => {
   const newPlayer = {
     id: 'p_' + Math.random().toString(36).slice(2, 10),
     name: name.trim().slice(0, 12), isHost: false, isAI: false, connected: true,
-    betArtifactIds: [], remainingVotes: 2,
+    seatNumber: 0, betArtifactIds: [], remainingVotes: 2,
   };
   room.players.push(newPlayer as any);
+  engine.reindexSeats(room);
   res.json({ playerId: newPlayer.id, room: roomManager.toPublicRoom(room, newPlayer.id) });
 });
 
@@ -126,6 +127,7 @@ gameRouter.post('/rooms/:code/addAI', (req, res) => {
   if (room.players.length >= room.maxPlayers) return res.status(400).json({ error: '房间已满' });
   const result = roomManager.addAI(code);
   if (!result.ok) return res.status(400).json({ error: result.error });
+  engine.reindexSeats(room);
   res.json({ room: roomManager.toPublicRoom(room, (req.body as any)?.playerId) });
 });
 
@@ -147,6 +149,12 @@ gameRouter.post('/rooms/:code/action', (req, res) => {
         if (!player.isHost) { error = '只有房主可以踢人'; break; }
         if (room.game.phase !== 'waiting') { error = '游戏已开始'; break; }
         const r = roomManager.removePlayer(code, msg.targetId);
+        if (!r.ok) error = r.error!;
+        engine.reindexSeats(room);
+        break;
+      }
+      case 'changeSeat': {
+        const r = engine.changeSeat(room, playerId, msg.targetId);
         if (!r.ok) error = r.error!;
         break;
       }

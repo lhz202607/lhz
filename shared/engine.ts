@@ -60,7 +60,7 @@ export function createRoom(hostName: string, maxPlayers: number = 8): Room {
   const hostId = generatePlayerId();
   return {
     code: generateRoomCode(), maxPlayers,
-    players: [{ id: hostId, name: hostName, isHost: true, isAI: false, connected: true, betArtifactIds: [], remainingVotes: 0 }],
+    players: [{ id: hostId, name: hostName, isHost: true, isAI: false, connected: true, seatNumber: 1, betArtifactIds: [], remainingVotes: 0 }],
     game: createInitialState(),
     createdAt: Date.now(),
   };
@@ -70,9 +70,32 @@ export function createAIPlayer(name?: string): Player {
   const aiNames = ['AI·许衡', 'AI·黄克明', 'AI·药来', 'AI·姬天明', 'AI·木户三郎', 'AI·郑老'];
   return {
     id: generatePlayerId(), name: name || aiNames[Math.floor(Math.random() * aiNames.length)],
-    isHost: false, isAI: true, connected: true,
+    isHost: false, isAI: true, connected: true, seatNumber: 0,
     betArtifactIds: [], remainingVotes: 0,
   };
+}
+
+/** 按当前玩家列表（房主+真人+AI，保持数组顺序）重新分配座位号 1,2,3... */
+export function reindexSeats(room: Room): void {
+  room.players.forEach((p, i) => { p.seatNumber = i + 1; });
+}
+
+/**
+ * 落座阶段交换两个玩家的座位号（游戏开始前可用）。
+ * 返回 { ok, error? }
+ */
+export function changeSeat(room: Room, playerId: string, targetId: string): { ok: boolean; error?: string } {
+  if (room.game.phase !== 'waiting' && room.game.phase !== 'ended') {
+    return { ok: false, error: '游戏已开始，座位已固定' };
+  }
+  if (playerId === targetId) return { ok: false, error: '不能与自己交换' };
+  const a = room.players.find(p => p.id === playerId);
+  const b = room.players.find(p => p.id === targetId);
+  if (!a || !b) return { ok: false, error: '玩家不存在' };
+  const tmp = a.seatNumber;
+  a.seatNumber = b.seatNumber;
+  b.seatNumber = tmp;
+  return { ok: true };
 }
 
 /** 分配角色（随机、不重复） */
@@ -143,6 +166,7 @@ export function startRound(room: Room, roundNumber: number, allArtifacts: Artifa
     roundNumber, phase: 'appraise', speechOrder, currentSpeakerIndex: 0,
     artifacts, laochaofengUsedFlip: false, betCounts: {}, events: [],
     currentAppraiserId: firstAppraiser, appraiseOrder, finishedAppraisers: [],
+    actualOrder: [firstAppraiser],
     yaoburanSealUsedThisRound: false,
   };
 
@@ -231,13 +255,21 @@ export function passAppraiseTurn(room: Room, playerId: string, nextPlayerId: str
   if (!nextPlayer) return { ok: false, error: '目标玩家不存在' };
   if (!round.finishedAppraisers.includes(playerId)) round.finishedAppraisers.push(playerId);
   const nextCheck = canAppraise(room, nextPlayerId);
+  // 被封印或随机无法鉴宝的玩家仍需"轮到自己"，手动点击结束回合（不自动跳过）
+  if (!nextCheck.can && (nextCheck.reason === '本轮已被封印' || nextCheck.reason === '本轮心神不宁')) {
+    round.currentAppraiserId = nextPlayerId;
+    pushActual(round, nextPlayerId);
+    return { ok: true };
+  }
+  // 其余强制无法鉴宝的情况（如次数用尽前的角色）才自动跳过
   if (!nextCheck.can) {
     if (!round.finishedAppraisers.includes(nextPlayerId)) round.finishedAppraisers.push(nextPlayerId);
+    pushActual(round, nextPlayerId);
     const remaining = round.appraiseOrder.find(id => !round.finishedAppraisers.includes(id) && canAppraise(room, id).can);
-    if (remaining) { round.currentAppraiserId = remaining; return { ok: true }; }
+    if (remaining) { round.currentAppraiserId = remaining; pushActual(round, remaining); return { ok: true }; }
     const anyLeft = round.appraiseOrder.find(id => !round.finishedAppraisers.includes(id) && canAppraise(room, id).can);
     if (!anyLeft) {
-      round.appraiseOrder.forEach(id => { if (!round.finishedAppraisers.includes(id)) round.finishedAppraisers.push(id); });
+      round.appraiseOrder.forEach(id => { if (!round.finishedAppraisers.includes(id)) { round.finishedAppraisers.push(id); pushActual(round, id); } });
       round.currentAppraiserId = undefined;
       enterDiscussPhase(room);
       round.events.push('全员鉴宝完毕，进入发言环节。');
@@ -245,7 +277,14 @@ export function passAppraiseTurn(room: Room, playerId: string, nextPlayerId: str
     return { ok: true };
   }
   round.currentAppraiserId = nextPlayerId;
+  pushActual(round, nextPlayerId);
   return { ok: true };
+}
+
+/** 记录实际发生鉴宝行动的玩家（按发生先后，去重保留首次） */
+function pushActual(round: GameRound, playerId: string): void {
+  if (!round.actualOrder) round.actualOrder = [];
+  if (!round.actualOrder.includes(playerId)) round.actualOrder.push(playerId);
 }
 
 export function isAppraiseDone(room: Room): boolean {
@@ -289,17 +328,18 @@ export function yaoburanSeal(room: Room, playerId: string, targetId: string): { 
     // 前置位：延迟到下一轮生效，本轮照常鉴宝
     room.game.pendingSeals[targetId] = room.game.currentRound + 1;
     const tname = target.name;
-    round.events.push(`药不然封印了${tname}（前置位），封印将于下一轮生效。`);
+    // 机密信息：仅药不然本人可见
+    round.secretEvents = round.secretEvents || [];
+    round.secretEvents.push(`你偷袭了${tname}（前置位），封印将于下一轮生效。`);
     round.yaoburanSealUsedThisRound = true;
     return { ok: true, delayed: true };
   } else {
     // 非前置位：本轮立即生效
     rs.sealed = true;
     if (target.role === 'jiyunfu') target.permanentlyDisabled = true;
-    // 立即封方震：不连带许愿（仅当方震为前置位、延迟到下一轮封印时才连带许愿）
-    if (target.role === 'fangzhen') {
-      round.events.push(`药不然封印了${target.name}（后置位），方震本轮被封印，许愿不受影响。`);
-    }
+    // 机密信息：仅药不然本人可见（不向其他玩家及老朝奉泄露偷袭目标）
+    round.secretEvents = round.secretEvents || [];
+    round.secretEvents.push(`你偷袭了${target.name}（后置位），其本轮被封印，下位行动受限。`);
   }
   round.yaoburanSealUsedThisRound = true;
   return { ok: true };

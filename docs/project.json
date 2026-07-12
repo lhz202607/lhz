@@ -3,6 +3,6 @@
   "sub_project_type": "",
   "name": "古董局中局兽首",
   "app_slug": "antique-zodiac-heads",
-  "version_description": "Fix seal feedback host gating order timeline",
+  "version_description": "Restrict seal info to yaoburan only",
   "preview_type": "pc"
 }
