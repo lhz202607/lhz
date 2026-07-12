@@ -403,9 +403,11 @@ export function resolveBets(room: Room): void {
   // 以本轮全部 4 个兽首为基准统计票数（未获投票的兽首记为 0 票）
   const entries = round.artifacts.map(a => ({ artifactId: a.id, count: round.betCounts[a.id] || 0 }));
 
-  if (entries.every(e => e.count === 0)) { round.events.push('本轮无人押币。'); return; }
+  const noVotes = entries.every(e => e.count === 0);
+  if (noVotes) round.events.push('本轮无人押币，按十二生肖顺序揭示。');
 
   // 统一排序：票数降序，票数相同时按生肖 ID 升序（鼠→猪）
+  // 全 0 票（极端情况）也按此规则：隐藏生肖序第一，揭示生肖序第二
   entries.sort((a, b) => b.count - a.count || a.artifactId - b.artifactId);
 
   // 第1名：隐藏
