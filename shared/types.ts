@@ -168,6 +168,7 @@ export interface GameRound {
   revealedArtifactName?: string;
   revealedIsReal?: boolean;
   hiddenArtifactName?: string;
+  hiddenIsReal?: boolean;
   /** 本轮许愿阵营得分增量（揭示真品+1，鉴人环节另计） */
   roundScore?: number;
   events: string[];

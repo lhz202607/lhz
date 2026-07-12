@@ -1,8 +1,8 @@
 {
   "project_type": "web",
   "sub_project_type": "",
-  "name": "古董局中局兽首",
-  "app_slug": "antique-zodiac-heads",
-  "version_description": "Add lifecycle tests for sealed random block",
+  "name": "古董局中局·十二兽首",
+  "app_slug": "antique-game",
+  "version_description": "Fix Fangzhen turn skip for no-appraise roles",
   "preview_type": "pc"
 }

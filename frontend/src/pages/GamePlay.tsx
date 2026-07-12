@@ -756,8 +756,7 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
   const myAppraisals = game.myAppraisals[g.currentRound] || [];
   const sealedRound = game.sealedRounds.includes(g.currentRound);
   const fangzhenPenalty = !!(game.fangzhenSealPenaltyRounds || []).includes(g.currentRound);
-  const myRS = game.playerRoundStates?.[me.id]?.[g.currentRound];
-  const randomlyBlockedRound = !!(myRS && myRS.randomlyBlocked && !myRS.sealed);
+  const randomlyBlockedRound = (game.randomlyBlockedRounds || []).includes(g.currentRound);
   const [turnEnded, setTurnEnded] = useState(false);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [popupResult, setPopupResult] = useState<any>(null);
@@ -822,12 +821,14 @@ function AppraisePanel({ room, game }: { room: any; game: any }) {
           <div className="text-sm text-ivory-dim">
             剩余鉴定次数：<span className="text-gold-glow font-bold">{remaining}</span> / {roleInfo.appraiseCount}
           </div>
-        ) : (
+        ) : isMyTurn ? (
           <div className="text-sm text-vermilion">
             {sealedRound ? (randomlyBlockedRound ? '本轮心神不宁' : '本轮已被封印')
               : fangzhenPenalty ? '你本轮丧失鉴宝能力'
                 : roleInfo.appraiseCount === 0 ? '本角色不擅鉴宝' : '无法鉴宝'}
           </div>
+        ) : roleInfo.appraiseCount === 0 ? null : (
+          <div className="text-sm text-ivory-dim">等待轮到</div>
         )}
       </div>
 
@@ -1826,6 +1827,7 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
           if (!rd) return null;
           const revealedName = rd.revealedArtifactName;
           const hiddenName = rd.hiddenArtifactName;
+          const hiddenIsReal = rd.hiddenIsReal;
           const isReal = rd.revealedIsReal;
           const score = rd.roundScore || 0;
           const hasVotes = Object.keys(rd.playerVotes || {}).some(pid => (rd.playerVotes![pid]?.length || 0) > 0);
@@ -1834,7 +1836,7 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
               <div className="text-gold-glow text-xs font-bold mb-2 flex items-center justify-between">
                 <span>第 {roundNum} 轮</span>
                 <span className={score > 0 ? 'text-jade' : 'text-ivory-dim'}>
-                  {score > 0 ? '+1 分' : '0 分'}
+                  {score > 0 ? `+${score} 分` : '0 分'}
                 </span>
               </div>
               {hasVotes ? (
@@ -1851,7 +1853,12 @@ function EndScreen({ room, game, onRestart, onLeave, isHost }: any) {
                   {hiddenName && (
                     <div className="flex items-center justify-between bg-black/20 px-2 py-1 rounded">
                       <span className="text-ivory-dim">隐藏</span>
-                      <span className="text-ivory">{hiddenName}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-ivory">{hiddenName}</span>
+                        <span className={hiddenIsReal ? 'text-jade font-bold' : 'text-vermilion font-bold'}>
+                          {hiddenIsReal ? '真' : '假'}
+                        </span>
+                      </span>
                     </div>
                   )}
                 </div>

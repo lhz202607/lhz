@@ -249,8 +249,9 @@ export function appraise(room: Room, playerId: string, artifactId: number): Appr
   const rs = room.game.playerRoundStates[playerId][room.game.currentRound];
   let appearsReal = artifact.isReal;
   const role = ROLES[player.role!];
-  if (role.id !== 'jiyunfu' && round.laochaofengUsedFlip) appearsReal = !appearsReal;
+  // 老朝奉颠倒乾坤：只有老朝奉阵营（老朝奉本人、药不然）不受翻转影响
   if (role.faction === 'laochaofeng') appearsReal = artifact.isReal;
+  else if (round.laochaofengUsedFlip) appearsReal = !appearsReal;
   const result: AppraisalResult = { artifactId, appearsReal };
   rs.appraisals.push(result);
   return result;
@@ -483,10 +484,15 @@ export function resolveBets(room: Room): void {
   round.hiddenArtifactId = hiddenId;
   const hiddenArtifact = round.artifacts.find(a => a.id === hiddenId)!;
   round.hiddenArtifactName = hiddenArtifact.name;
+  round.hiddenIsReal = hiddenArtifact.isReal;
   round.events.push(`【${hiddenArtifact.name}】票数排名第一（${entries[0].count}票），已被隐藏。`);
+  if (hiddenArtifact.isReal) {
+    room.game.xuyuanScore += 1;
+    round.events.push(`隐藏的真品【${hiddenArtifact.name}】，许愿阵营 +1 分。`);
+  }
 
   // 第2名：揭示真假（票数第二多；并列时按生肖顺序取靠前者）
-  let roundScore = 0;
+  let roundScore = hiddenArtifact.isReal ? 1 : 0;
   const revealedId = entries[1].artifactId;
   round.revealedArtifactId = revealedId;
   const revealedArtifact = round.artifacts.find(a => a.id === revealedId)!;
@@ -496,7 +502,7 @@ export function resolveBets(room: Room): void {
   round.events.push(`【${revealedArtifact.name}】票数排名第二（${entries[1].count}票），予以揭露——${revealedIsReal ? '真品！' : '赝品。'}`);
   if (revealedIsReal) {
     room.game.xuyuanScore += 1;
-    roundScore = 1;
+    roundScore += 1;
     round.events.push('揭露真品，许愿阵营 +1 分。');
   }
   round.roundScore = roundScore;

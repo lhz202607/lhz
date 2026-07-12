@@ -156,6 +156,7 @@ class RoomManager {
           finishedAppraisers: r.finishedAppraisers,
           playerVotes: r.playerVotes,
           hiddenArtifactName: r.hiddenArtifactName,
+          hiddenIsReal: r.hiddenIsReal,
           revealedArtifactName: r.revealedArtifactName,
           revealedIsReal: r.revealedIsReal,
           roundScore: r.roundScore || 0,

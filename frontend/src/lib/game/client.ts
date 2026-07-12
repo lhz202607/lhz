@@ -14,6 +14,7 @@ interface GameState {
   myAppraisals: any;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
+  randomlyBlockedRounds: number[];
   fangzhenSealPenaltyRounds: number[];
   knownAllies: { playerId: string; playerName: string; roleId: RoleId }[];
   remainingVotes: number;
@@ -23,7 +24,7 @@ interface GameState {
 
 let state: GameState = {
   room: null, me: null, myRole: null, myAppraisals: {},
-  fangzhenResults: [], sealedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
+  fangzhenResults: [], sealedRounds: [], randomlyBlockedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
   error: null, connected: false,
 };
 
@@ -44,6 +45,7 @@ interface HeartbeatResponse {
   myAppraisals: Record<number, AppraisalResult[]>;
   fangzhenResults: { round: number; targetId: string; targetName: string; faction: Faction }[];
   sealedRounds: number[];
+  randomlyBlockedRounds: number[];
   fangzhenSealPenaltyRounds?: number[];
   knownAllies?: { playerId: string; playerName: string; roleId: RoleId }[];
   remainingVotes?: number;
@@ -57,6 +59,7 @@ function applyHeartbeat(data: HeartbeatResponse): void {
     myAppraisals: data.myAppraisals,
     fangzhenResults: data.fangzhenResults,
     sealedRounds: data.sealedRounds,
+    randomlyBlockedRounds: data.randomlyBlockedRounds || [],
     fangzhenSealPenaltyRounds: data.fangzhenSealPenaltyRounds || [],
     knownAllies: data.knownAllies || [],
     remainingVotes: data.remainingVotes || 0,
@@ -109,6 +112,7 @@ export async function connectGame(code: string, name: string, pid?: string): Pro
       myAppraisals: res.data.myAppraisals || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
+      randomlyBlockedRounds: res.data.randomlyBlockedRounds || [],
       knownAllies: res.data.knownAllies || [],
       remainingVotes: res.data.remainingVotes || 0,
     });
@@ -128,6 +132,7 @@ export async function send(msg: ClientMessage): Promise<void> {
       myAppraisals: res.data.myAppraisals || {},
       fangzhenResults: res.data.fangzhenResults || [],
       sealedRounds: res.data.sealedRounds || [],
+      randomlyBlockedRounds: res.data.randomlyBlockedRounds || [],
       knownAllies: res.data.knownAllies || [],
       remainingVotes: res.data.remainingVotes || 0,
     });
@@ -158,7 +163,7 @@ export function disconnectGame(): void {
   playerId = null; roomCode = null;
   state = {
     room: null, me: null, myRole: null, myAppraisals: [],
-    fangzhenResults: [], sealedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
+    fangzhenResults: [], sealedRounds: [], randomlyBlockedRounds: [], fangzhenSealPenaltyRounds: [], knownAllies: [], remainingVotes: 0,
     error: null, connected: false,
   };
   emit();
